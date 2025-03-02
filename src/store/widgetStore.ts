@@ -42,12 +42,14 @@ export const useWidgetStore = create<WidgetState>((set, get) => ({
       const { data, error } = await supabase
         .from('widget_settings')
         .select('*')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1);
       
       if (error) throw error;
       
       if (data && data.length > 0) {
-        // Settings exist, use the first one
+        // Settings exist, use the most recent one
         set({ settings: data[0] as WidgetSettings });
       } else {
         // Create default settings if none exist
@@ -92,15 +94,21 @@ export const useWidgetStore = create<WidgetState>((set, get) => ({
       
       if (error) throw error;
       
+      // Fetch the updated settings to ensure we have the latest data
+      const { data: updatedData, error: fetchError } = await supabase
+        .from('widget_settings')
+        .select('*')
+        .eq('id', currentSettings.id)
+        .single();
+        
+      if (fetchError) throw fetchError;
+      
       set({ 
-        settings: {
-          ...currentSettings,
-          ...settings,
-          updated_at: new Date().toISOString(),
-        } 
+        settings: updatedData as WidgetSettings
       });
     } catch (error) {
       console.error('Error updating widget settings:', error);
+      throw error;
     }
   },
   

@@ -15,6 +15,7 @@ const WidgetSettings: React.FC = () => {
   const [fallbackMessage, setFallbackMessage] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [installCode, setInstallCode] = useState('');
+  const [saveStatus, setSaveStatus] = useState('');
   
   useEffect(() => {
     if (user) {
@@ -47,15 +48,29 @@ const WidgetSettings: React.FC = () => {
   }, [user]);
   
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !settings) return;
     
-    await updateSettings({
-      business_name: businessName,
-      primary_color: primaryColor,
-      welcome_message: welcomeMessage,
-      sales_representative: salesRepresentative,
-      fallback_message: fallbackMessage,
-    });
+    setSaveStatus('Saving...');
+    
+    try {
+      await updateSettings({
+        business_name: businessName,
+        primary_color: primaryColor,
+        welcome_message: welcomeMessage,
+        sales_representative: salesRepresentative,
+        fallback_message: fallbackMessage,
+      });
+      
+      setSaveStatus('Settings saved successfully!');
+      
+      // Clear the success message after 3 seconds
+      setTimeout(() => {
+        setSaveStatus('');
+      }, 3000);
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      setSaveStatus('Error saving settings. Please try again.');
+    }
   };
   
   const copyInstallCode = () => {
@@ -154,6 +169,12 @@ const WidgetSettings: React.FC = () => {
             >
               Save Settings
             </button>
+            
+            {saveStatus && (
+              <span className={`ml-3 text-sm ${saveStatus.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+                {saveStatus}
+              </span>
+            )}
           </div>
           
           <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">

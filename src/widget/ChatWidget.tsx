@@ -30,15 +30,18 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
   useEffect(() => {
     const fetchWidgetData = async () => {
       try {
-        // Fetch widget settings
+        // Fetch widget settings - get the most recent one
         const { data: settingsData, error: settingsError } = await supabase
           .from('widget_settings')
           .select('*')
           .eq('user_id', uid)
-          .single();
+          .order('created_at', { ascending: false })
+          .limit(1);
         
         if (settingsError) throw settingsError;
-        setSettings(settingsData);
+        if (settingsData && settingsData.length > 0) {
+          setSettings(settingsData[0]);
+        }
         
         // Fetch auto replies
         const { data: autoRepliesData, error: autoRepliesError } = await supabase
@@ -64,6 +67,75 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
     };
     
     fetchWidgetData();
+    
+    // Set up a real-time subscription to widget_settings
+    const settingsSubscription = supabase
+      .channel('widget_settings_changes')
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'widget_settings',
+          filter: `user_id=eq.${uid}`
+        }, 
+        (payload) => {
+          setSettings(payload.new);
+        }
+      )
+      .subscribe();
+      
+    // Set up a real-time subscription to auto_replies
+    const autoRepliesSubscription = supabase
+      .channel('auto_replies_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'auto_replies',
+          filter: `user_id=eq.${uid}`
+        }, 
+        () => {
+          // Refetch all auto replies when any change occurs
+          supabase
+            .from('auto_replies')
+            .select('*')
+            .eq('user_id', uid)
+            .then(({ data }) => {
+              if (data) setAutoReplies(data);
+            });
+        }
+      )
+      .subscribe();
+      
+    // Set up a real-time subscription to advanced_replies
+    const advancedRepliesSubscription = supabase
+      .channel('advanced_replies_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'advanced_replies',
+          filter: `user_id=eq.${uid}`
+        }, 
+        () => {
+          // Refetch all advanced replies when any change occurs
+          supabase
+            .from('advanced_replies')
+            .select('*')
+            .eq('user_id', uid)
+            .then(({ data }) => {
+              if (data) setAdvancedReplies(data);
+            });
+        }
+      )
+      .subscribe();
+    
+    // Clean up subscriptions
+    return () => {
+      supabase.removeChannel(settingsSubscription);
+      supabase.removeChannel(autoRepliesSubscription);
+      supabase.removeChannel(advancedRepliesSubscription);
+    };
   }, [uid]);
   
   // Initialize chat session
