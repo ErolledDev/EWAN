@@ -35,7 +35,7 @@ const WidgetSettings: React.FC = () => {
   
   useEffect(() => {
     if (user) {
-      const code = `<script src="https://widget-chat-ai.netlify.app/chat.js"></script>
+      const code = `<script src="https://widget-chat-ai.netlify.app/widget/chat.umd.js"></script>
 
 <script>
   new BusinessChatPlugin({

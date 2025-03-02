@@ -1,8 +1,45 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send, ChevronDown, ChevronUp } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 import { format } from 'date-fns';
+
+// Define Lucide icon components manually to avoid dependency issues
+const LucideIcon = ({ 
+  icon, 
+  className = "w-6 h-6", 
+  ...props 
+}: { 
+  icon: string, 
+  className?: string, 
+  [key: string]: any 
+}) => {
+  const icons: Record<string, React.ReactNode> = {
+    MessageCircle: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>
+      </svg>
+    ),
+    X: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+        <path d="M18 6 6 18"/>
+        <path d="m6 6 12 12"/>
+      </svg>
+    ),
+    Send: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+        <path d="m22 2-7 20-4-9-9-4Z"/>
+        <path d="M22 2 11 13"/>
+      </svg>
+    ),
+    ChevronDown: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+        <path d="m6 9 6 6 6-6"/>
+      </svg>
+    )
+  };
+
+  return <>{icons[icon]}</>;
+};
 
 interface ChatWidgetProps {
   uid: string;
@@ -25,6 +62,12 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [visitorId, setVisitorId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Create Supabase client
+  const supabase = createClient(
+    'https://zawhdprorlwaagmmyyer.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inphd2hkcHJvcmx3YWFnbW15eWVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5MzU1NTEsImV4cCI6MjA1NjUxMTU1MX0.HaHu907PQHPxSWNQrUsP6gNOpRaN08PnSZF-pN-BaD8'
+  );
   
   // Fetch widget settings and replies
   useEffect(() => {
@@ -136,7 +179,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
       supabase.removeChannel(autoRepliesSubscription);
       supabase.removeChannel(advancedRepliesSubscription);
     };
-  }, [uid]);
+  }, [uid, supabase]);
   
   // Initialize chat session
   useEffect(() => {
@@ -202,7 +245,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
     };
     
     createChatSession();
-  }, [isOpen, uid, visitorId, sessionId, settings]);
+  }, [isOpen, uid, visitorId, sessionId, settings, supabase]);
   
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -366,9 +409,9 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
         style={{ backgroundColor: settings.primary_color || '#4f46e5' }}
       >
         {isOpen ? (
-          <X className="w-6 h-6 text-white" />
+          <LucideIcon icon="X" className="w-6 h-6 text-white" />
         ) : (
-          <MessageCircle className="w-6 h-6 text-white" />
+          <LucideIcon icon="MessageCircle" className="w-6 h-6 text-white" />
         )}
       </button>
       
@@ -385,7 +428,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
               onClick={toggleChat}
               className="text-white focus:outline-none"
             >
-              <ChevronDown className="w-5 h-5" />
+              <LucideIcon icon="ChevronDown" className="w-5 h-5" />
             </button>
           </div>
           
@@ -449,7 +492,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
                 className="px-4 py-2 border border-transparent rounded-r-md focus:outline-none"
                 style={{ backgroundColor: settings.primary_color || '#4f46e5' }}
               >
-                <Send className="w-5 h-5 text-white" />
+                <LucideIcon icon="Send" className="w-5 h-5 text-white" />
               </button>
             </div>
           </form>

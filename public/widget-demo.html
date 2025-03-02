@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Widget Demo</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f9fafb;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    header {
+      background-color: #4f46e5;
+      color: white;
+      padding: 1rem 2rem;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      margin: 0;
+    }
+    .content {
+      background-color: white;
+      border-radius: 0.5rem;
+      padding: 2rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    .code-block {
+      background-color: #f3f4f6;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    pre {
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Chat Widget Demo</h1>
+  </header>
+  
+  <div class="container">
+    <div class="content">
+      <h2>Widget Installation Example</h2>
+      <p>This page demonstrates how the chat widget appears when installed on a website. The widget should appear in the bottom right corner of the page.</p>
+      
+      <h3>How to Install on Your Website</h3>
+      <p>To add this chat widget to your own website, copy and paste the following code just before the closing <code>&lt;/body&gt;</code> tag:</p>
+      
+      <div class="code-block">
+        <pre><code>&lt;script src="https://widget-chat-ai.netlify.app/widget/chat.umd.js"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+  new BusinessChatPlugin({
+    uid: 'YOUR_USER_ID'
+  });
+&lt;/script&gt;</code></pre>
+      </div>
+      
+      <p>Replace <code>YOUR_USER_ID</code> with your user ID from the dashboard.</p>
+    </div>
+  </div>
+  
+  <!-- Chat Widget Script -->
+  <script src="/widget/chat.umd.js"></script>
+  <script>
+    // Replace this with a real user ID from your system
+    new BusinessChatPlugin({
+      uid: '00000000-0000-0000-0000-000000000000'
+    });
+  </script>
+</body>
+</html>

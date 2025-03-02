@@ -15,7 +15,7 @@ A modern, customizable chat widget that can be easily installed on any website. 
 1. Add the script to your website:
 
 ```html
-<script src="https://widget-chat-ai.netlify.app/chat.js"></script>
+<script src="https://widget-chat-ai.netlify.app/widget/chat.umd.js"></script>
 
 <script>
   new BusinessChatPlugin({
@@ -64,7 +64,11 @@ To build the widget for production:
 npm run build:widget
 ```
 
-This will create a `dist/widget` directory with the widget files.
+This will create a `dist/widget` directory with the widget files. The main file to include on websites is `chat.umd.js`.
+
+## Testing the Widget
+
+After building the widget, you can test it by opening the `public/widget-demo.html` file in your browser. This file demonstrates how to include and initialize the widget on a website.
 
 ## Database Schema
 
