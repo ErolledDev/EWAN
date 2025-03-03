@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { AutoReply as AutoReplyType } from '../../types';
 import { Plus, Trash, Upload, Download, Edit, Search, AlertCircle } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 
 const AutoReply: React.FC = () => {
   const { user } = useAuthStore();
@@ -192,6 +193,11 @@ const AutoReply: React.FC = () => {
   
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <Helmet>
+        <title>Auto Reply - ChatWidget Dashboard</title>
+        <meta name="description" content="Set up keyword-based auto replies for your chat widget to respond to common questions automatically." />
+      </Helmet>
+      
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Auto Reply</h1>
         

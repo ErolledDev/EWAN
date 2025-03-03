@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import LoginForm from '../components/Auth/LoginForm';
 import { useAuthStore } from '../store/authStore';
+import { Helmet } from 'react-helmet-async';
 
 const HomePage: React.FC = () => {
   const { user } = useAuthStore();
@@ -17,6 +18,11 @@ const HomePage: React.FC = () => {
   
   return (
     <div className="min-h-screen bg-gray-50">
+      <Helmet>
+        <title>ChatWidget - Engage with your visitors in real-time</title>
+        <meta name="description" content="Add a powerful chat widget to your website with auto-replies, advanced responses, AI-powered conversations, and live agent support." />
+      </Helmet>
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="py-12">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">

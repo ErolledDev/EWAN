@@ -4,6 +4,7 @@ import { useWidgetStore } from '../../store/widgetStore';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { Copy, Check, Settings, MessageSquare, Palette, User, AlertTriangle } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 
 const WidgetSettings: React.FC = () => {
   const { user } = useAuthStore();
@@ -108,6 +109,11 @@ const WidgetSettings: React.FC = () => {
   
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
+      <Helmet>
+        <title>Widget Settings - ChatWidget Dashboard</title>
+        <meta name="description" content="Configure your chat widget settings including business name, colors, and welcome messages." />
+      </Helmet>
+      
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Widget Settings</h1>
         <button

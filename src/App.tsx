@@ -10,6 +10,7 @@ import AiMode from './components/Dashboard/AiMode';
 import LiveChat from './components/Dashboard/LiveChat';
 import NotificationContainer from './components/ui/NotificationContainer';
 import { useNotificationStore } from './store/notificationStore';
+import { Helmet } from 'react-helmet-async';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuthStore();
@@ -37,6 +38,20 @@ function App() {
   
   return (
     <BrowserRouter>
+      <Helmet>
+        <title>ChatWidget - Engage with your visitors in real-time</title>
+        <meta name="description" content="Add a powerful chat widget to your website with auto-replies, advanced responses, AI-powered conversations, and live agent support." />
+        <meta name="keywords" content="chat widget, live chat, customer support, auto-reply, AI chat, website chat" />
+        <meta property="og:title" content="ChatWidget - Engage with your visitors in real-time" />
+        <meta property="og:description" content="Add a powerful chat widget to your website with auto-replies, advanced responses, AI-powered conversations, and live agent support." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://chatwidget.app" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="ChatWidget - Engage with your visitors in real-time" />
+        <meta name="twitter:description" content="Add a powerful chat widget to your website with auto-replies, advanced responses, AI-powered conversations, and live agent support." />
+        <link rel="canonical" href="https://chatwidget.app" />
+      </Helmet>
+      
       <NotificationContainer 
         notifications={notifications} 
         onClose={removeNotification} 

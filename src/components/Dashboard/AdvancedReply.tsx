@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { AdvancedReply as AdvancedReplyType } from '../../types';
 import { Plus, Trash, Upload, Download, Edit, Search, AlertCircle, ExternalLink } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 
 const AdvancedReply: React.FC = () => {
   const { user } = useAuthStore();
@@ -214,6 +215,11 @@ const AdvancedReply: React.FC = () => {
   
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <Helmet>
+        <title>Advanced Reply - ChatWidget Dashboard</title>
+        <meta name="description" content="Create rich responses with HTML and clickable links for your chat widget." />
+      </Helmet>
+      
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Advanced Reply</h1>
         

@@ -3,6 +3,7 @@ import { useWidgetStore } from '../../store/widgetStore';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { AlertCircle, Bot, Key, Cpu, FileText } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 
 const AiMode: React.FC = () => {
   const { user } = useAuthStore();
@@ -72,6 +73,11 @@ const AiMode: React.FC = () => {
   
   return (
     <div className="p-6 max-w-4xl mx-auto">
+      <Helmet>
+        <title>AI Mode - ChatWidget Dashboard</title>
+        <meta name="description" content="Configure AI-powered responses for your chat widget to handle complex queries automatically." />
+      </Helmet>
+      
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">AI Mode</h1>
         
@@ -142,7 +148,7 @@ const AiMode: React.FC = () => {
                   </label>
                 </div>
                 <input
-                  id="apiKey"
+                  id=" apiKey"
                   type="password"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
