@@ -57,4 +57,14 @@ export interface ChatSession {
   status: 'active' | 'closed';
   created_at: string;
   updated_at: string;
+  metadata?: {
+    visitorName?: string;
+    pinned?: boolean;
+    note?: string;
+    label?: {
+      text: string;
+      color: string;
+    };
+    [key: string]: any;
+  };
 }

@@ -19,6 +19,7 @@ interface ChatState {
   
   toggleAgentMode: () => void;
   closeSession: (sessionId: string) => Promise<void>;
+  updateSessionMetadata: (sessionId: string, metadata: Record<string, any>) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -48,6 +49,12 @@ export const useChatStore = create<ChatState>()(
             const stillActive = data.some(session => session.id === currentSession.id);
             if (!stillActive) {
               set({ currentSession: null });
+            } else {
+              // Update the current session with the latest data
+              const updatedSession = data.find(session => session.id === currentSession.id);
+              if (updatedSession) {
+                set({ currentSession: updatedSession as ChatSession });
+              }
             }
           }
         } catch (error) {
@@ -67,6 +74,7 @@ export const useChatStore = create<ChatState>()(
               status: 'active',
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
+              metadata: {}
             })
             .select()
             .single();
@@ -191,6 +199,46 @@ export const useChatStore = create<ChatState>()(
           return;
         } catch (error) {
           console.error('Error closing chat session:', error);
+          throw error;
+        }
+      },
+      
+      updateSessionMetadata: async (sessionId: string, metadata: Record<string, any>) => {
+        try {
+          // Update the session metadata
+          const { error } = await supabase
+            .from('chat_sessions')
+            .update({
+              metadata,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', sessionId);
+          
+          if (error) throw error;
+          
+          // Update the session in the local state
+          set({
+            activeSessions: get().activeSessions.map(session => 
+              session.id === sessionId 
+                ? { ...session, metadata, updated_at: new Date().toISOString() } 
+                : session
+            )
+          });
+          
+          // If this is the current session, update it too
+          if (get().currentSession?.id === sessionId) {
+            set({ 
+              currentSession: { 
+                ...get().currentSession!, 
+                metadata,
+                updated_at: new Date().toISOString()
+              } 
+            });
+          }
+          
+          return;
+        } catch (error) {
+          console.error('Error updating session metadata:', error);
           throw error;
         }
       }
