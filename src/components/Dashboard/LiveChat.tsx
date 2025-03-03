@@ -23,7 +23,9 @@ import {
   RefreshCw,
   Loader,
   UserCircle,
-  ChevronDown
+  ChevronDown,
+  ArrowLeft,
+  Menu
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
@@ -60,6 +62,7 @@ const LiveChat: React.FC = () => {
   const [filterOption, setFilterOption] = useState('all');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -69,9 +72,15 @@ const LiveChat: React.FC = () => {
   // Check if screen is mobile
   useEffect(() => {
     const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth < 768 && !sidebarCollapsed) {
-        setSidebarCollapsed(true);
+      const isMobileScreen = window.innerWidth < 768;
+      setIsMobile(isMobileScreen);
+      
+      // On mobile, default to showing the conversation list
+      if (isMobileScreen) {
+        setSidebarCollapsed(false);
+        setMobileView('list');
+      } else {
+        setSidebarCollapsed(false);
       }
     };
     
@@ -81,7 +90,7 @@ const LiveChat: React.FC = () => {
     return () => {
       window.removeEventListener('resize', checkIfMobile);
     };
-  }, [sidebarCollapsed]);
+  }, []);
   
   // Close filter menu when clicking outside
   useEffect(() => {
@@ -135,9 +144,9 @@ const LiveChat: React.FC = () => {
         }
       }, 3000); // Poll every 3 seconds
       
-      // On mobile, collapse sidebar when a session is selected
+      // On mobile, switch to chat view when a session is selected
       if (isMobile) {
-        setSidebarCollapsed(true);
+        setMobileView('chat');
       }
       
       return () => clearInterval(interval);
@@ -195,6 +204,9 @@ const LiveChat: React.FC = () => {
       
       if (currentSession?.id === sessionId) {
         setCurrentSession('');
+        if (isMobile) {
+          setMobileView('list');
+        }
       }
       
       addNotification({
@@ -380,6 +392,19 @@ const LiveChat: React.FC = () => {
     }
   };
   
+  const handleSelectSession = (sessionId: string) => {
+    setCurrentSession(sessionId);
+    if (isMobile) {
+      setMobileView('chat');
+    }
+  };
+  
+  const handleBackToList = () => {
+    if (isMobile) {
+      setMobileView('list');
+    }
+  };
+  
   // Filter sessions based on search term and filter option
   const filteredSessions = activeSessions.filter(session => {
     const visitorNameOrId = session.metadata?.visitorName || session.visitor_id;
@@ -472,7 +497,7 @@ const LiveChat: React.FC = () => {
         <div 
           className={`border-r border-gray-200 bg-white flex flex-col transition-all duration-300 ease-in-out ${
             sidebarCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-full md:w-80 opacity-100'
-          }`}
+          } ${isMobile && mobileView === 'chat' ? 'hidden md:flex' : ''}`}
         >
           <div className="p-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between mb-3">
@@ -602,7 +627,7 @@ const LiveChat: React.FC = () => {
                       className={`hover:bg-gray-50 cursor-pointer transition-colors ${
                         currentSession?.id === session.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''
                       }`}
-                      onClick={() => setCurrentSession(session.id)}
+                      onClick={() => handleSelectSession(session.id)}
                     >
                       <div className="p-3">
                         <div className="flex items-start justify-between">
@@ -652,25 +677,22 @@ const LiveChat: React.FC = () => {
           </div>
         </div>
         
-        {/* Toggle sidebar button */}
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className={`fixed md:absolute ${sidebarCollapsed ? 'left-4 top-4' : 'left-64 md:left-80'} md:top-1/2 md:transform md:-translate-y-1/2 bg-white border border-gray-200 rounded-md p-1.5 shadow-sm z-10 text-gray-500 hover:text-gray-700 focus:outline-none transition-all duration-300`}
-        >
-          {sidebarCollapsed ? (
-            <MessageCircle className="h-5 w-5" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
-        </button>
-        
         {/* Chat area */}
-        <div className="flex-1 flex flex-col bg-gray-50">
+        <div className={`flex-1 flex flex-col bg-gray-50 ${isMobile && mobileView === 'list' ? 'hidden md:flex' : ''}`}>
           {currentSession ? (
             <>
               {/* Chat header */}
               <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between shadow-sm">
                 <div className="flex items-center">
+                  {isMobile && (
+                    <button
+                      onClick={handleBackToList}
+                      className="mr-2 p-1 rounded-full hover:bg-gray-100 text-gray-500"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </button>
+                  )}
+                  
                   <div className="bg-indigo-100 rounded-full p-2.5 mr-3">
                     <UserCircle className="h-5 w-5 text-indigo-600" />
                   </div>
@@ -966,8 +988,8 @@ const LiveChat: React.FC = () => {
                 <MessageSquare className="h-16 w-16 text-indigo-300 mx-auto mb-4" />
                 <h2 className="text-xl font-medium mb-2 text-gray-800">No conversation selected</h2>
                 <p className="text-sm text-gray-500 mb-6">
-                  {sidebarCollapsed ? 
-                    "Click the message icon to view conversations" : 
+                  {isMobile ? 
+                    "Select a conversation from the list" : 
                     "Select a conversation from the sidebar or wait for new visitors to start chatting."}
                 </p>
                 <p className="text-xs text-gray-400 flex items-center justify-center">
