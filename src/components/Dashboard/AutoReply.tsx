@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useWidgetStore } from '../../store/widgetStore';
 import { useAuthStore } from '../../store/authStore';
+import { useNotificationStore } from '../../store/notificationStore';
 import { AutoReply as AutoReplyType } from '../../types';
 import { Plus, Trash, Upload, Download, Edit, Search, AlertCircle } from 'lucide-react';
 
@@ -15,6 +16,7 @@ const AutoReply: React.FC = () => {
     importAutoReplies,
     exportAutoReplies
   } = useWidgetStore();
+  const { addNotification } = useNotificationStore();
   
   const [keywords, setKeywords] = useState('');
   const [matchingType, setMatchingType] = useState<'word_match' | 'fuzzy_match' | 'regex' | 'synonym_match'>('word_match');
@@ -47,12 +49,22 @@ const AutoReply: React.FC = () => {
           response,
         });
         setEditingId(null);
+        addNotification({
+          type: 'success',
+          title: 'Auto reply updated successfully',
+          duration: 3000,
+        });
       } else {
         await addAutoReply({
           user_id: user.id,
           keywords: keywordArray,
           matching_type: matchingType,
           response,
+        });
+        addNotification({
+          type: 'success',
+          title: 'Auto reply added successfully',
+          duration: 3000,
         });
       }
       
@@ -62,6 +74,12 @@ const AutoReply: React.FC = () => {
       setResponse('');
     } catch (error) {
       console.error('Error saving auto reply:', error);
+      addNotification({
+        type: 'error',
+        title: 'Error saving auto reply',
+        message: 'Please try again.',
+        duration: 5000,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -85,8 +103,19 @@ const AutoReply: React.FC = () => {
     setIsDeleting(id);
     try {
       await deleteAutoReply(id);
+      addNotification({
+        type: 'success',
+        title: 'Auto reply deleted successfully',
+        duration: 3000,
+      });
     } catch (error) {
       console.error('Error deleting auto reply:', error);
+      addNotification({
+        type: 'error',
+        title: 'Error deleting auto reply',
+        message: 'Please try again.',
+        duration: 5000,
+      });
     } finally {
       setIsDeleting(null);
     }
@@ -109,10 +138,21 @@ const AutoReply: React.FC = () => {
           }));
           
           await importAutoReplies(formattedData);
+          addNotification({
+            type: 'success',
+            title: 'Auto replies imported successfully',
+            message: `${formattedData.length} replies imported`,
+            duration: 3000,
+          });
         }
       } catch (error) {
         console.error('Error importing data:', error);
-        alert('Failed to import data. Please check the file format.');
+        addNotification({
+          type: 'error',
+          title: 'Failed to import data',
+          message: 'Please check the file format.',
+          duration: 5000,
+        });
       }
     };
     
@@ -133,6 +173,12 @@ const AutoReply: React.FC = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    addNotification({
+      type: 'success',
+      title: 'Auto replies exported successfully',
+      duration: 3000,
+    });
   };
   
   // Filter auto replies based on search term

@@ -8,6 +8,8 @@ import AutoReply from './components/Dashboard/AutoReply';
 import AdvancedReply from './components/Dashboard/AdvancedReply';
 import AiMode from './components/Dashboard/AiMode';
 import LiveChat from './components/Dashboard/LiveChat';
+import NotificationContainer from './components/ui/NotificationContainer';
+import { useNotificationStore } from './store/notificationStore';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuthStore();
@@ -27,6 +29,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 function App() {
   const { getUser } = useAuthStore();
+  const { notifications, removeNotification } = useNotificationStore();
   
   useEffect(() => {
     getUser();
@@ -34,6 +37,10 @@ function App() {
   
   return (
     <BrowserRouter>
+      <NotificationContainer 
+        notifications={notifications} 
+        onClose={removeNotification} 
+      />
       <Routes>
         <Route path="/" element={<HomePage />} />
         

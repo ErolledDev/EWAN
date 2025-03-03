@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import { useWidgetStore } from '../../store/widgetStore';
 import { useAuthStore } from '../../store/authStore';
+import { useNotificationStore } from '../../store/notificationStore';
 import { Copy, Check, Settings, MessageSquare, Palette, User, AlertTriangle } from 'lucide-react';
 
 const WidgetSettings: React.FC = () => {
   const { user } = useAuthStore();
   const { settings, fetchSettings, updateSettings } = useWidgetStore();
+  const { addNotification } = useNotificationStore();
   
   const [businessName, setBusinessName] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#4f46e5');
@@ -15,7 +17,6 @@ const WidgetSettings: React.FC = () => {
   const [fallbackMessage, setFallbackMessage] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [installCode, setInstallCode] = useState('');
-  const [saveStatus, setSaveStatus] = useState('');
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -53,7 +54,6 @@ const WidgetSettings: React.FC = () => {
     if (!user || !settings) return;
     
     setIsSaving(true);
-    setSaveStatus('Saving...');
     
     try {
       await updateSettings({
@@ -64,15 +64,19 @@ const WidgetSettings: React.FC = () => {
         fallback_message: fallbackMessage,
       });
       
-      setSaveStatus('Settings saved successfully!');
-      
-      // Clear the success message after 3 seconds
-      setTimeout(() => {
-        setSaveStatus('');
-      }, 3000);
+      addNotification({
+        type: 'success',
+        title: 'Settings saved successfully!',
+        duration: 3000,
+      });
     } catch (error) {
       console.error('Error saving settings:', error);
-      setSaveStatus('Error saving settings. Please try again.');
+      addNotification({
+        type: 'error',
+        title: 'Error saving settings',
+        message: 'Please try again.',
+        duration: 5000,
+      });
     } finally {
       setIsSaving(false);
     }
@@ -81,6 +85,12 @@ const WidgetSettings: React.FC = () => {
   const copyInstallCode = () => {
     navigator.clipboard.writeText(installCode);
     setCopied(true);
+    
+    addNotification({
+      type: 'success',
+      title: 'Code copied to clipboard',
+      duration: 2000,
+    });
     
     // Reset copied state after 2 seconds
     setTimeout(() => {
@@ -271,12 +281,6 @@ const WidgetSettings: React.FC = () => {
             )}
           </button>
         </div>
-        
-        {saveStatus && (
-          <div className={`p-4 rounded-md ${saveStatus.includes('Error') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-            {saveStatus}
-          </div>
-        )}
       </div>
     </div>
   );
