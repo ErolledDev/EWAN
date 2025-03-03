@@ -72,6 +72,7 @@ const LiveChat: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
+  const labelMenuRef = useRef<HTMLDivElement>(null);
   
   // Check if screen is mobile
   useEffect(() => {
@@ -96,7 +97,7 @@ const LiveChat: React.FC = () => {
     };
   }, []);
   
-  // Close filter menu when clicking outside
+  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
@@ -105,6 +106,10 @@ const LiveChat: React.FC = () => {
       
       if (actionMenuRef.current && !actionMenuRef.current.contains(event.target as Node)) {
         setShowActionMenu(false);
+      }
+      
+      if (labelMenuRef.current && !labelMenuRef.current.contains(event.target as Node)) {
+        setShowLabelMenu(false);
       }
     };
     
@@ -413,6 +418,21 @@ const LiveChat: React.FC = () => {
     }
   };
   
+  // Open label menu with proper positioning
+  const handleOpenLabelMenu = () => {
+    setShowLabelMenu(true);
+    setShowActionMenu(false);
+    
+    // Initialize with current label if exists
+    if (currentSession?.metadata?.label) {
+      setLabelText(currentSession.metadata.label.text);
+      setLabelColor(currentSession.metadata.label.color);
+    } else {
+      setLabelText('');
+      setLabelColor('#4f46e5');
+    }
+  };
+  
   // Filter sessions based on search term and filter option
   const filteredSessions = activeSessions.filter(session => {
     const visitorNameOrId = session.metadata?.visitorName || session.visitor_id;
@@ -493,12 +513,101 @@ const LiveChat: React.FC = () => {
     }
   };
   
+  // Render the label management modal
+  const renderLabelManagementModal = () => {
+    if (!showLabelMenu) return null;
+    
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          {/* Background overlay */}
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowLabelMenu(false)}></div>
+          
+          {/* Modal panel */}
+          <div 
+            ref={labelMenuRef}
+            className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+          >
+            <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <div className="sm:flex sm:items-start">
+                <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                    Manage Label
+                  </h3>
+                  <div className="mt-4">
+                    <label htmlFor="labelText" className="block text-sm font-medium text-gray-700">
+                      Label Text
+                    </label>
+                    <input
+                      type="text"
+                      id="labelText"
+                      value={labelText}
+                      onChange={(e) => setLabelText(e.target.value)}
+                      placeholder="Enter label text"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Label Color
+                    </label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'].map(color => (
+                        <button
+                          key={color}
+                          onClick={() => setLabelColor(color)}
+                          className={`w-8 h-8 rounded-full ${labelColor === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
+                          style={{ backgroundColor: color }}
+                          aria-label={`Select color ${color}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <button
+                type="button"
+                onClick={handleAddLabel}
+                disabled={!labelText.trim()}
+                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm disabled:bg-indigo-300 disabled:cursor-not-allowed"
+              >
+                Apply
+              </button>
+              {currentSession?.metadata?.label && (
+                <button
+                  type="button"
+                  onClick={handleRemoveLabel}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-red-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Remove
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowLabelMenu(false)}
+                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div className="h-full flex flex-col">
       <Helmet>
         <title>Live Chat - ChatWidget Dashboard</title>
         <meta name="description" content="Engage with your website visitors in real-time through live chat." />
       </Helmet>
+      
+      {/* Label Management Modal */}
+      {renderLabelManagementModal()}
       
       <div className="flex-1 flex overflow-hidden">
         {/* Sessions sidebar */}
@@ -772,70 +881,15 @@ const LiveChat: React.FC = () => {
                       <Pin className="h-5 w-5" />
                     </button>
                     
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowLabelMenu(!showLabelMenu)}
-                        className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
-                          currentSession.metadata?.label ? 'text-indigo-600' : 'text-gray-400'
-                        }`}
-                        title="Manage label"
-                      >
-                        <Tag className="h-5 w-5" />
-                      </button>
-                      
-                      {showLabelMenu && (
-                        <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 p-4 border border-gray-200">
-                          <h3 className="text-sm font-medium mb-2">Manage Label</h3>
-                          <input
-                            type="text"
-                            value={labelText}
-                            onChange={(e) => setLabelText(e.target.value)}
-                            placeholder="Label text"
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 mb-2"
-                          />
-                          
-                          <div className="mb-3">
-                            <label className="block text-xs text-gray-500 mb-1">Color</label>
-                            <div className="flex flex-wrap gap-2">
-                              {['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'].map(color => (
-                                <button
-                                  key={color}
-                                  onClick={() => setLabelColor(color)}
-                                  className={`w-6 h-6 rounded-full ${labelColor === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
-                                  style={{ backgroundColor: color }}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                          
-                          <div className="flex justify-between">
-                            <button
-                              onClick={() => setShowLabelMenu(false)}
-                              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                              Cancel
-                            </button>
-                            
-                            {currentSession.metadata?.label ? (
-                              <button
-                                onClick={handleRemoveLabel}
-                                className="px-3 py-1.5 border border-red-300 rounded-md text-sm text-red-700 hover:bg-red-50 transition-colors"
-                              >
-                                Remove
-                              </button>
-                            ) : null}
-                            
-                            <button
-                              onClick={handleAddLabel}
-                              disabled={!labelText.trim()}
-                              className="px-3 py-1.5 bg-indigo-600 rounded-md text-sm text-white hover:bg-indigo-700 disabled:bg-indigo-300 transition-colors"
-                            >
-                              Apply
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <button
+                      onClick={handleOpenLabelMenu}
+                      className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
+                        currentSession.metadata?.label ? 'text-indigo-600' : 'text-gray-400'
+                      }`}
+                      title="Manage label"
+                    >
+                      <Tag className="h-5 w-5" />
+                    </button>
                     
                     <button
                       onClick={() => setShowNoteEditor(!showNoteEditor)}
@@ -881,7 +935,7 @@ const LiveChat: React.FC = () => {
                           
                           <button
                             onClick={() => {
-                              setShowLabelMenu(true);
+                              handleOpenLabelMenu();
                               setShowActionMenu(false);
                             }}
                             className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
@@ -1066,7 +1120,7 @@ const LiveChat: React.FC = () => {
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
                     placeholder={agentMode ? "Type your message..." : "Enable agent mode to reply"}
-                    className={`flex-1 border border-gray-300 rounded-l-md px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${!agentMode ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                    className={`flex-1 border border-gray-300 rounded-l-md px-4 py-2. 5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${!agentMode ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                     disabled={!agentMode}
                   />
                   <button
