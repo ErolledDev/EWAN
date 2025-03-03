@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Settings, MessageSquare, Zap, Bot, MessageCircle } from 'lucide-react';
+import { Settings, MessageSquare, Zap, Bot, MessageCircle, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 const Navigation: React.FC = () => {
@@ -12,7 +12,7 @@ const Navigation: React.FC = () => {
         <h1 className="text-xl font-bold">Chat Widget</h1>
       </div>
       
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         <NavLink
           to="/dashboard/widget-settings"
           className={({ isActive }) =>
@@ -89,6 +89,7 @@ const Navigation: React.FC = () => {
           onClick={() => signOut()}
           className="flex items-center px-4 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 w-full"
         >
+          <LogOut className="mr-3 h-5 w-5" />
           Sign Out
         </button>
       </div>

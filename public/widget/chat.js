@@ -1,4 +1,4 @@
-// Manual implementation of the chat widget
+// Optimized chat widget implementation
 (function() {
   // Create a style element for the widget
   function injectStyles() {
@@ -65,6 +65,18 @@
       .cw-overflow-hidden { overflow: hidden; }
       .cw-overflow-y-auto { overflow-y: auto; }
       .cw-opacity-70 { opacity: 0.7; }
+      .cw-cursor-pointer { cursor: pointer; }
+      .cw-transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+      .cw-hover-bg-gray-100:hover { background-color: #f3f4f6; }
+      .cw-focus-outline-none:focus { outline: 2px solid transparent; outline-offset: 2px; }
+      .cw-focus-ring-2:focus { --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color); --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000); }
+      .cw-focus-ring-blue-500:focus { --tw-ring-color: #3b82f6; }
+      
+      /* Responsive styles */
+      @media (max-width: 640px) {
+        .cw-w-80 { width: calc(100vw - 2rem); }
+        .cw-max-w-80 { max-width: 90%; }
+      }
       
       @media (min-width: 640px) {
         .cw-sm-w-96 { width: 24rem; }
@@ -96,6 +108,16 @@
     return Math.random().toString(36).substring(2, 15);
   }
 
+  // Debounce function to limit API calls
+  function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+      const context = this;
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(context, args), wait);
+    };
+  }
+
   class ChatWidget {
     constructor(options) {
       this.userId = options.uid;
@@ -107,6 +129,8 @@
       this.sessionId = null;
       this.visitorId = localStorage.getItem('chat_visitor_id') || generateId();
       this.messagePollingInterval = null;
+      this.typingTimeout = null;
+      this.isTyping = false;
       
       // Save visitor ID
       localStorage.setItem('chat_visitor_id', this.visitorId);
@@ -189,12 +213,13 @@
       
       // Chat button
       const chatButton = document.createElement('button');
-      chatButton.className = 'cw-flex cw-items-center cw-justify-center cw-w-14 cw-h-14 cw-rounded-full cw-shadow-lg';
+      chatButton.className = 'cw-flex cw-items-center cw-justify-center cw-w-14 cw-h-14 cw-rounded-full cw-shadow-lg cw-transition-all cw-focus-outline-none cw-focus-ring-2 cw-focus-ring-blue-500';
       chatButton.style.backgroundColor = this.settings.primary_color || '#4f46e5';
       chatButton.innerHTML = this.isOpen ? 
         `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.x}</span>` : 
         `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.messageCircle}</span>`;
       chatButton.addEventListener('click', () => this.toggleChat());
+      chatButton.setAttribute('aria-label', this.isOpen ? 'Close chat' : 'Open chat');
       this.container.appendChild(chatButton);
       
       // Chat window
@@ -212,9 +237,10 @@
         title.textContent = this.settings.business_name || 'Chat';
         
         const closeButton = document.createElement('button');
-        closeButton.className = 'cw-text-white';
+        closeButton.className = 'cw-text-white cw-focus-outline-none cw-focus-ring-2 cw-focus-ring-blue-500';
         closeButton.innerHTML = `<span class="cw-w-5 cw-h-5">${icons.chevronDown}</span>`;
         closeButton.addEventListener('click', () => this.toggleChat());
+        closeButton.setAttribute('aria-label', 'Minimize chat');
         
         header.appendChild(title);
         header.appendChild(closeButton);
@@ -278,6 +304,14 @@
         
         chatWindow.appendChild(messagesContainer);
         
+        // Typing indicator
+        if (this.isTyping) {
+          const typingIndicator = document.createElement('div');
+          typingIndicator.className = 'cw-px-4 cw-py-2 cw-text-gray-500 cw-text-sm';
+          typingIndicator.textContent = 'Agent is typing...';
+          chatWindow.appendChild(typingIndicator);
+        }
+        
         // Input form
         const form = document.createElement('form');
         form.className = 'cw-p-4 cw-border-t cw-border-gray-200';
@@ -288,13 +322,15 @@
         const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Type your message...';
-        input.className = 'cw-flex-1 cw-px-3 cw-py-2 cw-border cw-border-gray-300 cw-rounded-l-md';
+        input.className = 'cw-flex-1 cw-px-3 cw-py-2 cw-border cw-border-gray-300 cw-rounded-l-md cw-focus-outline-none cw-focus-ring-2 cw-focus-ring-blue-500';
+        input.setAttribute('aria-label', 'Message');
         
         const sendButton = document.createElement('button');
         sendButton.type = 'submit';
-        sendButton.className = 'cw-px-4 cw-py-2 cw-border cw-border-transparent cw-rounded-r-md';
+        sendButton.className = 'cw-px-4 cw-py-2 cw-border cw-border-transparent cw-rounded-r-md cw-focus-outline-none cw-focus-ring-2 cw-focus-ring-blue-500';
         sendButton.style.backgroundColor = this.settings.primary_color || '#4f46e5';
         sendButton.innerHTML = `<span class="cw-w-5 cw-h-5 cw-text-white">${icons.send}</span>`;
+        sendButton.setAttribute('aria-label', 'Send message');
         
         inputContainer.appendChild(input);
         inputContainer.appendChild(sendButton);
@@ -310,6 +346,11 @@
         
         chatWindow.appendChild(form);
         this.container.appendChild(chatWindow);
+        
+        // Set focus to input
+        setTimeout(() => {
+          input.focus();
+        }, 100);
         
         // Scroll to bottom of messages
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -460,7 +501,7 @@
       // Save user message to database
       try {
         // Update session's updated_at timestamp
-        await fetch(`${this.supabase.url}/rest/v1/chat_sessions`, {
+        await fetch(`${this.supabase.url}/rest/v1/chat_sessions?id=eq.${this.sessionId}`, {
           method: 'PATCH',
           headers: {
             'apikey': this.supabase.key,
@@ -490,6 +531,9 @@
       } catch (error) {
         console.error('Error saving user message:', error);
       }
+      
+      // Show typing indicator
+      this.showTypingIndicator();
       
       // Process the message to find a reply
       const userMessageLower = text.toLowerCase();
@@ -567,6 +611,28 @@
       if (!replied && this.settings?.fallback_message) {
         await this.sendBotReply(this.settings.fallback_message);
       }
+      
+      // Hide typing indicator
+      this.hideTypingIndicator();
+    }
+    
+    showTypingIndicator() {
+      this.isTyping = true;
+      this.render();
+      
+      // Set a timeout to hide the typing indicator after a random time (1-3 seconds)
+      this.typingTimeout = setTimeout(() => {
+        this.hideTypingIndicator();
+      }, Math.random() * 2000 + 1000);
+    }
+    
+    hideTypingIndicator() {
+      if (this.typingTimeout) {
+        clearTimeout(this.typingTimeout);
+        this.typingTimeout = null;
+      }
+      this.isTyping = false;
+      this.render();
     }
     
     async sendBotReply(text) {

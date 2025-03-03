@@ -3,6 +3,7 @@ import { HexColorPicker } from 'react-colorful';
 import { useWidgetStore } from '../../store/widgetStore';
 import { useAuthStore } from '../../store/authStore';
 import WidgetPreview from '../../widget/WidgetPreview';
+import { Copy, Check } from 'lucide-react';
 
 const WidgetSettings: React.FC = () => {
   const { user } = useAuthStore();
@@ -16,6 +17,7 @@ const WidgetSettings: React.FC = () => {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [installCode, setInstallCode] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
+  const [copied, setCopied] = useState(false);
   
   useEffect(() => {
     if (user) {
@@ -35,7 +37,7 @@ const WidgetSettings: React.FC = () => {
   
   useEffect(() => {
     if (user) {
-      const code = `<script src="https://widget-chat-ai.netlify.app/widget/chat.umd.js"></script>
+      const code = `<script src="https://widget-chat-ai.netlify.app/widget/chat.js"></script>
 
 <script>
   new BusinessChatPlugin({
@@ -75,15 +77,24 @@ const WidgetSettings: React.FC = () => {
   
   const copyInstallCode = () => {
     navigator.clipboard.writeText(installCode);
-    alert('Installation code copied to clipboard!');
+    setCopied(true);
+    
+    // Reset copied state after 2 seconds
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
   };
   
   if (!settings) {
-    return <div className="p-6">Loading settings...</div>;
+    return (
+      <div className="p-6 flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
   }
   
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <h1 className="text-2xl font-bold mb-6">Widget Settings</h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -111,13 +122,20 @@ const WidgetSettings: React.FC = () => {
                 onClick={() => setShowColorPicker(!showColorPicker)}
                 className="w-10 h-10 rounded-md border border-gray-300 shadow-sm"
                 style={{ backgroundColor: primaryColor }}
+                aria-label="Select color"
               />
               <span className="ml-3">{primaryColor}</span>
             </div>
             
             {showColorPicker && (
-              <div className="mt-2">
-                <HexColorPicker color={primaryColor} onChange={setPrimaryColor} />
+              <div className="mt-2 relative z-10">
+                <div 
+                  className="fixed inset-0" 
+                  onClick={() => setShowColorPicker(false)}
+                ></div>
+                <div className="relative">
+                  <HexColorPicker color={primaryColor} onChange={setPrimaryColor} />
+                </div>
               </div>
             )}
           </div>
@@ -183,18 +201,28 @@ const WidgetSettings: React.FC = () => {
               Add this code to your website to install the chat widget:
             </p>
             <div className="bg-gray-800 text-gray-200 p-3 rounded-md overflow-x-auto">
-              <pre className="text-sm">{installCode}</pre>
+              <pre className="text-sm whitespace-pre-wrap">{installCode}</pre>
             </div>
             <button
               onClick={copyInstallCode}
               className="mt-3 inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              Copy Code
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4 mr-2 text-green-500" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Code
+                </>
+              )}
             </button>
           </div>
         </div>
         
-        <div>
+        <div className="mt-6 lg:mt-0">
           <h2 className="text-lg font-medium mb-4">Widget Preview</h2>
           {user && <WidgetPreview userId={user.id} />}
         </div>

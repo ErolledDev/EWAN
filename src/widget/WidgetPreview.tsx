@@ -16,7 +16,7 @@ const WidgetPreview: React.FC<WidgetPreviewProps> = ({ userId }) => {
   }, [userId]);
   
   return (
-    <div className="relative min-h-[400px] border border-gray-200 rounded-lg bg-gray-50 p-4">
+    <div className="relative min-h-[400px] border border-gray-200 rounded-lg bg-gray-50 p-4 overflow-hidden">
       <div className="absolute bottom-4 right-4">
         <ChatWidget uid={userId} />
       </div>

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { format } from 'date-fns';
-import { MessageCircle, Send } from 'lucide-react';
+import { MessageCircle, Send, RefreshCw } from 'lucide-react';
 
 const LiveChat: React.FC = () => {
   const { user } = useAuthStore();
@@ -20,6 +20,8 @@ const LiveChat: React.FC = () => {
   
   const [newMessage, setNewMessage] = useState('');
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     if (user) {
@@ -55,6 +57,13 @@ const LiveChat: React.FC = () => {
     }
   }, [currentSession, fetchMessages]);
   
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, currentSession]);
+  
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -72,34 +81,56 @@ const LiveChat: React.FC = () => {
     }
   };
   
+  const handleRefresh = async () => {
+    if (!user) return;
+    
+    setIsRefreshing(true);
+    await fetchSessions(user.id);
+    if (currentSession) {
+      await fetchMessages(currentSession.id);
+    }
+    setIsRefreshing(false);
+  };
+  
   const currentMessages = currentSession ? messages[currentSession.id] || [] : [];
   
   return (
-    <div className="p-6 h-full">
+    <div className="p-4 md:p-6 h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Live Chat</h1>
         
-        <div className="flex items-center">
-          <span className="mr-2 text-sm text-gray-700">Agent Mode:</span>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={agentMode}
-              onChange={toggleAgentMode}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-          </label>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={handleRefresh}
+            className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          
+          <div className="flex items-center">
+            <span className="mr-2 text-sm text-gray-700">Agent Mode:</span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agentMode}
+                onChange={toggleAgentMode}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+          </div>
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 h-[calc(100vh-200px)]">
-        <div className="md:col-span-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-y-auto">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 flex-1 min-h-0">
+        <div className="md:col-span-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
           <div className="p-4 border-b border-gray-200">
             <h2 className="font-medium">Active Conversations</h2>
           </div>
           
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 overflow-y-auto flex-1">
             {activeSessions.length === 0 ? (
               <div className="p-4 text-gray-500 text-sm">
                 No active conversations.
@@ -128,7 +159,7 @@ const LiveChat: React.FC = () => {
           </div>
         </div>
         
-        <div className="md:col-span-3 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
+        <div className="md:col-span-3 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col min-h-0">
           {!currentSession ? (
             <div className="flex-1 flex items-center justify-center text-gray-500">
               Select a conversation to start chatting
@@ -139,6 +170,9 @@ const LiveChat: React.FC = () => {
                 <h2 className="font-medium">
                   Chat with Visitor {currentSession.visitor_id.substring(0, 8)}
                 </h2>
+                <div className="text-xs text-gray-500 mt-1">
+                  Started {format(new Date(currentSession.created_at), 'MMM d, yyyy h:mm a')}
+                </div>
               </div>
               
               <div className="flex-1 p-4 overflow-y-auto">
@@ -178,6 +212,7 @@ const LiveChat: React.FC = () => {
                         </div>
                       </div>
                     ))}
+                    <div ref={messagesEndRef} />
                   </div>
                 )}
               </div>
