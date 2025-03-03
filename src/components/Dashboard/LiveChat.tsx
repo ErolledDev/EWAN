@@ -26,7 +26,8 @@ import {
   ChevronDown,
   ArrowLeft,
   Menu,
-  MoreVertical
+  MoreVertical,
+  AlertTriangle
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
@@ -169,17 +170,17 @@ const LiveChat: React.FC = () => {
 
   // Focus input when session changes
   useEffect(() => {
-    if (currentSession && inputRef.current) {
+    if (currentSession && inputRef.current && agentMode) {
       setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
     }
-  }, [currentSession]);
+  }, [currentSession, agentMode]);
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!messageText.trim() || !currentSession) return;
+    if (!messageText.trim() || !currentSession || !agentMode) return;
     
     try {
       // Show typing indicator
@@ -948,6 +949,24 @@ const LiveChat: React.FC = () => {
                 </div>
               )}
               
+              {/* Agent mode warning */}
+              {!agentMode && (
+                <div className="bg-yellow-50 p-3 border-b border-yellow-200">
+                  <div className="flex items-center">
+                    <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
+                    <p className="text-sm text-yellow-700">
+                      <span className="font-medium">Agent mode is disabled.</span> Enable it to respond to messages.
+                    </p>
+                    <button
+                      onClick={toggleAgentMode}
+                      className="ml-auto px-3 py-1 bg-yellow-100 hover:bg-yellow-200 rounded text-xs font-medium text-yellow-800 transition-colors"
+                    >
+                      Enable Agent Mode
+                    </button>
+                  </div>
+                </div>
+              )}
+              
               {/* Chat messages */}
               <div 
                 ref={chatContainerRef}
@@ -964,36 +983,39 @@ const LiveChat: React.FC = () => {
                     {currentMessages.map((msg, index) => {
                       const isFirstInGroup = index === 0 || currentMessages[index - 1].sender_type !== msg.sender_type;
                       const isLastInGroup = index === currentMessages.length - 1 || currentMessages[index + 1].sender_type !== msg.sender_type;
+                      const isUserMessage = msg.sender_type === 'user';
+                      const isAgentMessage = msg.sender_type === 'agent';
+                      const isBotMessage = msg.sender_type === 'bot';
                       
                       return (
                         <div
                           key={msg.id}
-                          className={`flex ${msg.sender_type === 'agent' ? 'justify-end' : 'justify-start'}`}
+                          className={`flex ${isUserMessage ? 'justify-start' : 'justify-end'}`}
                         >
                           <div
                             className={`max-w-[75%] sm:max-w-md rounded-lg px-4 py-2 ${
-                              msg.sender_type === 'agent'
+                              isAgentMessage
                                 ? 'bg-indigo-100 text-indigo-800'
-                                : msg.sender_type === 'user'
-                                ? 'bg-white text-gray-800 border border-gray-200'
-                                : 'bg-green-100 text-green-800'
+                                : isBotMessage
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-white text-gray-800 border border-gray-200'
                             } ${
                               !isFirstInGroup && !isLastInGroup
-                                ? msg.sender_type === 'agent'
-                                  ? 'rounded-tr-none'
-                                  : 'rounded-tl-none'
+                                ? isUserMessage
+                                  ? 'rounded-tl-none'
+                                  : 'rounded-tr-none'
                                 : ''
                             } ${
                               isFirstInGroup && !isLastInGroup
-                                ? msg.sender_type === 'agent'
-                                  ? 'rounded-tr-none'
-                                  : 'rounded-tl-none'
+                                ? isUserMessage
+                                  ? 'rounded-tl-none'
+                                  : 'rounded-tr-none'
                                 : ''
                             } ${
                               !isFirstInGroup && isLastInGroup
-                                ? msg.sender_type === 'agent'
-                                  ? 'rounded-br-none'
-                                  : 'rounded-bl-none'
+                                ? isUserMessage
+                                  ? 'rounded-bl-none'
+                                  : 'rounded-br-none'
                                 : ''
                             }`}
                           >
@@ -1043,17 +1065,27 @@ const LiveChat: React.FC = () => {
                     type="text"
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
-                    placeholder="Type your message..."
-                    className="flex-1 border border-gray-300 rounded-l-md px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder={agentMode ? "Type your message..." : "Enable agent mode to reply"}
+                    className={`flex-1 border border-gray-300 rounded-l-md px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${!agentMode ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                    disabled={!agentMode}
                   />
                   <button
                     type="submit"
-                    disabled={!messageText.trim()}
-                    className="bg-indigo-600 text-white px-4 py-2.5 rounded-r-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300 transition-colors"
+                    disabled={!messageText.trim() || !agentMode}
+                    className={`px-4 py-2.5 rounded-r-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors ${
+                      agentMode 
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-300' 
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
                   >
                     <Send className="h-5 w-5" />
                   </button>
                 </form>
+                {!agentMode && (
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    You must enable Agent Mode to respond to messages
+                  </p>
+                )}
               </div>
             </>
           ) : (
