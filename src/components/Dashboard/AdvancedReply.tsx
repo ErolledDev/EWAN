@@ -165,10 +165,10 @@ const AdvancedReply: React.FC = () => {
   
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Advanced Reply</h1>
         
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
           <label className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
             <Upload className="h-4 w-4 mr-2" />
             Import

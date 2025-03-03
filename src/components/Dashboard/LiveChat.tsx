@@ -116,10 +116,10 @@ const LiveChat: React.FC = () => {
   
   return (
     <div className="p-4 md:p-6 h-full flex flex-col max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Live Chat</h1>
         
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-wrap items-center gap-4">
           <button
             onClick={handleRefresh}
             className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"

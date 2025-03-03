@@ -57,8 +57,8 @@ const DashboardPage: React.FC = () => {
         ></div>
       )}
       
-      {/* Main content */}
-      <div className={`flex-1 overflow-auto transition-all duration-300 ease-in-out ${sidebarOpen && !isMobile ? 'ml-64' : 'ml-0'}`}>
+      {/* Main content - Fixed the margin issue here */}
+      <div className="flex-1 overflow-auto transition-all duration-300 ease-in-out">
         <Outlet />
       </div>
     </div>
