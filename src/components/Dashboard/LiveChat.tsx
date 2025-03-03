@@ -15,7 +15,15 @@ import {
   Edit, 
   Trash, 
   X,
-  CheckCircle
+  CheckCircle,
+  MessageSquare,
+  ChevronRight,
+  ChevronLeft,
+  Filter,
+  RefreshCw,
+  Loader,
+  UserCircle,
+  ChevronDown
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
@@ -46,9 +54,48 @@ const LiveChat: React.FC = () => {
   const [labelColor, setLabelColor] = useState('#4f46e5');
   const [showNoteEditor, setShowNoteEditor] = useState(false);
   const [noteText, setNoteText] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [filterOption, setFilterOption] = useState('all');
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Check if screen is mobile
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth < 768 && !sidebarCollapsed) {
+        setSidebarCollapsed(true);
+      }
+    };
+    
+    checkIfMobile();
+    window.addEventListener('resize', checkIfMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkIfMobile);
+    };
+  }, [sidebarCollapsed]);
+  
+  // Close filter menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
+        setShowFilterMenu(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   
   // Fetch active sessions when component mounts
   useEffect(() => {
@@ -88,9 +135,14 @@ const LiveChat: React.FC = () => {
         }
       }, 3000); // Poll every 3 seconds
       
+      // On mobile, collapse sidebar when a session is selected
+      if (isMobile) {
+        setSidebarCollapsed(true);
+      }
+      
       return () => clearInterval(interval);
     }
-  }, [currentSession, fetchMessages]);
+  }, [currentSession, fetchMessages, isMobile]);
   
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -98,6 +150,15 @@ const LiveChat: React.FC = () => {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, currentSession]);
+
+  // Focus input when session changes
+  useEffect(() => {
+    if (currentSession && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+  }, [currentSession]);
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,10 +166,20 @@ const LiveChat: React.FC = () => {
     if (!messageText.trim() || !currentSession) return;
     
     try {
+      // Show typing indicator
+      setIsTyping(true);
+      
       await sendMessage(currentSession.id, messageText, 'agent');
       setMessageText('');
+      
+      // Hide typing indicator after a short delay
+      setTimeout(() => {
+        setIsTyping(false);
+      }, 500);
     } catch (error) {
       console.error('Error sending message:', error);
+      setIsTyping(false);
+      
       addNotification({
         type: 'error',
         title: 'Failed to send message',
@@ -282,17 +353,60 @@ const LiveChat: React.FC = () => {
       });
     }
   };
+
+  const handleRefreshSessions = async () => {
+    if (!user) return;
+    
+    setIsRefreshing(true);
+    try {
+      await fetchSessions(user.id);
+      
+      addNotification({
+        type: 'success',
+        title: 'Conversations refreshed',
+        duration: 2000,
+      });
+    } catch (error) {
+      console.error('Error refreshing sessions:', error);
+      
+      addNotification({
+        type: 'error',
+        title: 'Failed to refresh conversations',
+        message: 'Please try again.',
+        duration: 5000,
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
   
-  // Filter sessions based on search term
+  // Filter sessions based on search term and filter option
   const filteredSessions = activeSessions.filter(session => {
     const visitorNameOrId = session.metadata?.visitorName || session.visitor_id;
     const label = session.metadata?.label?.text || '';
     const note = session.metadata?.note || '';
     const searchLower = searchTerm.toLowerCase();
+    const isPinned = session.metadata?.pinned || false;
     
-    return visitorNameOrId.toLowerCase().includes(searchLower) || 
-           label.toLowerCase().includes(searchLower) ||
-           note.toLowerCase().includes(searchLower);
+    // First apply text search
+    const matchesSearch = visitorNameOrId.toLowerCase().includes(searchLower) || 
+                          label.toLowerCase().includes(searchLower) ||
+                          note.toLowerCase().includes(searchLower);
+    
+    if (!matchesSearch) return false;
+    
+    // Then apply filter
+    switch (filterOption) {
+      case 'pinned':
+        return isPinned;
+      case 'labeled':
+        return !!session.metadata?.label;
+      case 'noted':
+        return !!session.metadata?.note;
+      case 'all':
+      default:
+        return true;
+    }
   });
   
   // Sort sessions: pinned first, then by updated_at
@@ -307,6 +421,44 @@ const LiveChat: React.FC = () => {
   
   // Get current session messages
   const currentMessages = currentSession ? (messages[currentSession.id] || []) : [];
+
+  // Format timestamp with relative time
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) {
+      return 'Just now';
+    } else if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    } else if (diffInMinutes < 24 * 60) {
+      return format(date, 'h:mm a');
+    } else {
+      return format(date, 'MMM d, h:mm a');
+    }
+  };
+
+  // Get avatar initials
+  const getInitials = (name: string) => {
+    if (!name) return '?';
+    return name.charAt(0).toUpperCase();
+  };
+
+  // Get filter label
+  const getFilterLabel = () => {
+    switch (filterOption) {
+      case 'pinned':
+        return 'Pinned';
+      case 'labeled':
+        return 'Labeled';
+      case 'noted':
+        return 'With notes';
+      case 'all':
+      default:
+        return 'All';
+    }
+  };
   
   return (
     <div className="h-full flex flex-col">
@@ -317,11 +469,29 @@ const LiveChat: React.FC = () => {
       
       <div className="flex-1 flex overflow-hidden">
         {/* Sessions sidebar */}
-        <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium">Active Conversations</h2>
+        <div 
+          className={`border-r border-gray-200 bg-white flex flex-col transition-all duration-300 ease-in-out ${
+            sidebarCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-full md:w-80 opacity-100'
+          }`}
+        >
+          <div className="p-4 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-800">Conversations</h2>
+              <button
+                onClick={handleRefreshSessions}
+                disabled={isRefreshing}
+                className="p-1.5 rounded-full hover:bg-gray-200 text-gray-500 transition-colors"
+                title="Refresh conversations"
+              >
+                {isRefreshing ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+              </button>
+            </div>
             
-            <div className="mt-2 relative">
+            <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="h-4 w-4 text-gray-400" />
               </div>
@@ -330,28 +500,80 @@ const LiveChat: React.FC = () => {
                 placeholder="Search conversations..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="pl-10 pr-4 py-2.5 w-full border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               />
             </div>
             
-            <div className="mt-4 flex items-center">
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={agentMode}
-                  onChange={toggleAgentMode}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                />
-                <span className="ml-2 text-sm font-medium text-gray-700">Agent Mode</span>
-              </label>
-              
-              <div className="ml-2 relative inline-block">
-                <div className={`h-2 w-2 rounded-full ${agentMode ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+            <div className="mt-3 flex items-center justify-between">
+              <div className="flex items-center">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agentMode}
+                    onChange={toggleAgentMode}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">Agent Mode</span>
+                </label>
+                
+                <div className="ml-2 relative inline-block">
+                  <div className={`h-2 w-2 rounded-full ${agentMode ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                </div>
               </div>
               
-              <span className="ml-auto text-xs text-gray-500">
-                {activeSessions.length} active
-              </span>
+              <div className="relative" ref={filterMenuRef}>
+                <button
+                  onClick={() => setShowFilterMenu(!showFilterMenu)}
+                  className="flex items-center text-xs text-gray-500 hover:text-gray-700 bg-white px-2 py-1 rounded border border-gray-200 shadow-sm"
+                >
+                  <Filter className="h-3 w-3 mr-1" />
+                  <span className="mr-1">{getFilterLabel()}</span>
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+                
+                {showFilterMenu && (
+                  <div className="absolute right-0 mt-1 bg-white rounded-md shadow-lg z-10 border border-gray-200 text-xs w-32 animate-fadeIn">
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          setFilterOption('all');
+                          setShowFilterMenu(false);
+                        }}
+                        className={`block px-4 py-2 text-left w-full hover:bg-gray-100 ${filterOption === 'all' ? 'bg-indigo-50 text-indigo-700' : ''}`}
+                      >
+                        All conversations
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilterOption('pinned');
+                          setShowFilterMenu(false);
+                        }}
+                        className={`block px-4 py-2 text-left w-full hover:bg-gray-100 ${filterOption === 'pinned' ? 'bg-indigo-50 text-indigo-700' : ''}`}
+                      >
+                        Pinned only
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilterOption('labeled');
+                          setShowFilterMenu(false);
+                        }}
+                        className={`block px-4 py-2 text-left w-full hover:bg-gray-100 ${filterOption === 'labeled' ? 'bg-indigo-50 text-indigo-700' : ''}`}
+                      >
+                        With labels
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilterOption('noted');
+                          setShowFilterMenu(false);
+                        }}
+                        className={`block px-4 py-2 text-left w-full hover:bg-gray-100 ${filterOption === 'noted' ? 'bg-indigo-50 text-indigo-700' : ''}`}
+                      >
+                        With notes
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
@@ -361,30 +583,34 @@ const LiveChat: React.FC = () => {
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
               </div>
             ) : sortedSessions.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">
+              <div className="p-6 text-center text-gray-500">
                 <MessageCircle className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                <p className="text-sm">No active conversations</p>
+                <p className="text-sm font-medium">No active conversations</p>
+                <p className="text-xs mt-1">Waiting for visitors to start chatting</p>
               </div>
             ) : (
-              <ul className="divide-y divide-gray-200">
+              <ul className="divide-y divide-gray-100">
                 {sortedSessions.map((session) => {
                   const visitorName = session.metadata?.visitorName;
                   const isPinned = session.metadata?.pinned;
                   const label = session.metadata?.label;
+                  const hasNote = !!session.metadata?.note;
                   
                   return (
                     <li 
                       key={session.id}
-                      className={`hover:bg-gray-50 cursor-pointer ${
-                        currentSession?.id === session.id ? 'bg-indigo-50' : ''
+                      className={`hover:bg-gray-50 cursor-pointer transition-colors ${
+                        currentSession?.id === session.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''
                       }`}
                       onClick={() => setCurrentSession(session.id)}
                     >
-                      <div className="p-4">
+                      <div className="p-3">
                         <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-2">
-                            <div className="bg-gray-200 rounded-full p-2">
-                              <User className="h-5 w-5 text-gray-500" />
+                          <div className="flex items-start space-x-3">
+                            <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white font-medium ${
+                              currentSession?.id === session.id ? 'bg-indigo-500' : 'bg-gray-400'
+                            }`}>
+                              {visitorName ? getInitials(visitorName) : '?'}
                             </div>
                             <div>
                               <div className="flex items-center">
@@ -394,10 +620,13 @@ const LiveChat: React.FC = () => {
                                 {isPinned && (
                                   <Pin className="h-3 w-3 text-indigo-500 ml-1" />
                                 )}
+                                {hasNote && (
+                                  <Edit className="h-3 w-3 text-amber-500 ml-1" />
+                                )}
                               </div>
                               <p className="text-xs text-gray-500 flex items-center mt-1">
                                 <Clock className="h-3 w-3 mr-1" />
-                                {format(new Date(session.updated_at), 'MMM d, h:mm a')}
+                                {formatTimestamp(session.updated_at)}
                               </p>
                             </div>
                           </div>
@@ -423,15 +652,27 @@ const LiveChat: React.FC = () => {
           </div>
         </div>
         
+        {/* Toggle sidebar button */}
+        <button
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className={`fixed md:absolute ${sidebarCollapsed ? 'left-4 top-4' : 'left-64 md:left-80'} md:top-1/2 md:transform md:-translate-y-1/2 bg-white border border-gray-200 rounded-md p-1.5 shadow-sm z-10 text-gray-500 hover:text-gray-700 focus:outline-none transition-all duration-300`}
+        >
+          {sidebarCollapsed ? (
+            <MessageCircle className="h-5 w-5" />
+          ) : (
+            <ChevronLeft className="h-4 w-4" />
+          )}
+        </button>
+        
         {/* Chat area */}
         <div className="flex-1 flex flex-col bg-gray-50">
           {currentSession ? (
             <>
               {/* Chat header */}
-              <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+              <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between shadow-sm">
                 <div className="flex items-center">
-                  <div className="bg-indigo-100 rounded-full p-2 mr-3">
-                    <User className="h-5 w-5 text-indigo-600" />
+                  <div className="bg-indigo-100 rounded-full p-2.5 mr-3">
+                    <UserCircle className="h-5 w-5 text-indigo-600" />
                   </div>
                   
                   {isRenaming ? (
@@ -446,25 +687,25 @@ const LiveChat: React.FC = () => {
                       />
                       <button
                         onClick={handleRenameVisitor}
-                        className="ml-2 text-indigo-600 hover:text-indigo-800"
+                        className="ml-2 text-indigo-600 hover:text-indigo-800 transition-colors"
                       >
                         <CheckCircle className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => setIsRenaming(false)}
-                        className="ml-1 text-gray-500 hover:text-gray-700"
+                        className="ml-1 text-gray-500 hover:text-gray-700 transition-colors"
                       >
                         <X className="h-4 w-4" />
                       </button>
                     </div>
                   ) : (
                     <div className="flex items-center">
-                      <h2 className="text-lg font-medium">
+                      <h2 className="text-lg font-medium truncate max-w-[120px] md:max-w-xs">
                         {currentSession.metadata?.visitorName || `Visitor ${currentSession.visitor_id.substring(0, 8)}`}
                       </h2>
                       <button
                         onClick={() => setIsRenaming(true)}
-                        className="ml-2 text-gray-400 hover:text-gray-600"
+                        className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
@@ -484,10 +725,10 @@ const LiveChat: React.FC = () => {
                   )}
                 </div>
                 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
                   <button
                     onClick={handleTogglePin}
-                    className={`p-2 rounded-full hover:bg-gray-100 ${
+                    className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
                       currentSession.metadata?.pinned ? 'text-indigo-600' : 'text-gray-400'
                     }`}
                     title={currentSession.metadata?.pinned ? 'Unpin conversation' : 'Pin conversation'}
@@ -498,15 +739,17 @@ const LiveChat: React.FC = () => {
                   <div className="relative">
                     <button
                       onClick={() => setShowLabelMenu(!showLabelMenu)}
-                      className="p-2 rounded-full hover:bg-gray-100 text-gray-400"
-                      title="Add label"
+                      className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
+                        currentSession.metadata?.label ? 'text-indigo-600' : 'text-gray-400'
+                      }`}
+                      title="Manage label"
                     >
                       <Tag className="h-5 w-5" />
                     </button>
                     
                     {showLabelMenu && (
-                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 p-4">
-                        <h3 className="text-sm font-medium mb-2">Add Label</h3>
+                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 p-4 border border-gray-200">
+                        <h3 className="text-sm font-medium mb-2">Manage Label</h3>
                         <input
                           type="text"
                           value={labelText}
@@ -517,8 +760,8 @@ const LiveChat: React.FC = () => {
                         
                         <div className="mb-3">
                           <label className="block text-xs text-gray-500 mb-1">Color</label>
-                          <div className="flex space-x-2">
-                            {['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'].map(color => (
+                          <div className="flex flex-wrap gap-2">
+                            {['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'].map(color => (
                               <button
                                 key={color}
                                 onClick={() => setLabelColor(color)}
@@ -532,7 +775,7 @@ const LiveChat: React.FC = () => {
                         <div className="flex justify-between">
                           <button
                             onClick={() => setShowLabelMenu(false)}
-                            className="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+                            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                           >
                             Cancel
                           </button>
@@ -540,7 +783,7 @@ const LiveChat: React.FC = () => {
                           {currentSession.metadata?.label ? (
                             <button
                               onClick={handleRemoveLabel}
-                              className="px-3 py-1 border border-red-300 rounded-md text-sm text-red-700 hover:bg-red-50"
+                              className="px-3 py-1.5 border border-red-300 rounded-md text-sm text-red-700 hover:bg-red-50 transition-colors"
                             >
                               Remove
                             </button>
@@ -549,7 +792,7 @@ const LiveChat: React.FC = () => {
                           <button
                             onClick={handleAddLabel}
                             disabled={!labelText.trim()}
-                            className="px-3 py-1 bg-indigo-600 rounded-md text-sm text-white hover:bg-indigo-700 disabled:bg-indigo-300"
+                            className="px-3 py-1.5 bg-indigo-600 rounded-md text-sm text-white hover:bg-indigo-700 disabled:bg-indigo-300 transition-colors"
                           >
                             Apply
                           </button>
@@ -560,7 +803,9 @@ const LiveChat: React.FC = () => {
                   
                   <button
                     onClick={() => setShowNoteEditor(!showNoteEditor)}
-                    className="p-2 rounded-full hover:bg-gray-100 text-gray-400"
+                    className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
+                      currentSession.metadata?.note ? 'text-amber-500' : 'text-gray-400'
+                    }`}
                     title="Add note"
                   >
                     <Edit className="h-5 w-5" />
@@ -568,7 +813,7 @@ const LiveChat: React.FC = () => {
                   
                   <button
                     onClick={() => handleCloseSession(currentSession.id)}
-                    className="p-2 rounded-full hover:bg-gray-100 text-gray-400"
+                    className="p-2 rounded-full hover:bg-gray-100 hover:text-red-500 text-gray-400 transition-colors"
                     title="Close conversation"
                   >
                     <Trash className="h-5 w-5" />
@@ -578,25 +823,28 @@ const LiveChat: React.FC = () => {
               
               {/* Note editor */}
               {showNoteEditor && (
-                <div className="bg-yellow-50 p-4 border-b border-yellow-200">
-                  <h3 className="text-sm font-medium text-yellow-800 mb-2">Conversation Notes</h3>
+                <div className="bg-amber-50 p-4 border-b border-amber-200 animate-fadeIn">
+                  <h3 className="text-sm font-medium text-amber-800 mb-2 flex items-center">
+                    <Edit className="h-4 w-4 mr-1" />
+                    Conversation Notes
+                  </h3>
                   <textarea
                     value={noteText}
                     onChange={(e) => setNoteText(e.target.value)}
                     rows={3}
-                    className="w-full border border-yellow-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 mb-2"
+                    className="w-full border border-amber-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 mb-2 bg-white"
                     placeholder="Add private notes about this conversation..."
                   />
                   <div className="flex justify-end space-x-2">
                     <button
                       onClick={() => setShowNoteEditor(false)}
-                      className="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+                      className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleSaveNote}
-                      className="px-3 py-1 bg-yellow-600 rounded-md text-sm text-white hover:bg-yellow-700"
+                      className="px-3 py-1.5 bg-amber-600 rounded-md text-sm text-white hover:bg-amber-700 transition-colors"
                     >
                       Save Note
                     </button>
@@ -617,61 +865,95 @@ const LiveChat: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {currentMessages.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={`flex ${msg.sender_type === 'agent' ? 'justify-end' : 'justify-start'}`}
-                      >
+                    {currentMessages.map((msg, index) => {
+                      const isFirstInGroup = index === 0 || currentMessages[index - 1].sender_type !== msg.sender_type;
+                      const isLastInGroup = index === currentMessages.length - 1 || currentMessages[index + 1].sender_type !== msg.sender_type;
+                      
+                      return (
                         <div
-                          className={`max-w-xs sm:max-w-md rounded-lg px-4 py-2 ${
-                            msg.sender_type === 'agent'
-                              ? 'bg-indigo-100 text-indigo-800'
-                              : msg.sender_type === 'user'
-                              ? 'bg-gray-100 text-gray-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}
+                          key={msg.id}
+                          className={`flex ${msg.sender_type === 'agent' ? 'justify-end' : 'justify-start'}`}
                         >
-                          <div className="text-xs font-medium mb-1">
-                            {msg.sender_type === 'agent'
-                              ? 'You'
-                              : msg.sender_type === 'user'
-                              ? 'Visitor'
-                              : 'Bot'}
-                          </div>
-                          
-                          <div className="text-sm">
-                            {msg.sender_type === 'bot' ? (
-                              <div dangerouslySetInnerHTML={{ __html: msg.message }} />
-                            ) : (
-                              msg.message
+                          <div
+                            className={`max-w-[75%] sm:max-w-md rounded-lg px-4 py-2 ${
+                              msg.sender_type === 'agent'
+                                ? 'bg-indigo-100 text-indigo-800'
+                                : msg.sender_type === 'user'
+                                ? 'bg-white text-gray-800 border border-gray-200'
+                                : 'bg-green-100 text-green-800'
+                            } ${
+                              !isFirstInGroup && !isLastInGroup
+                                ? msg.sender_type === 'agent'
+                                  ? 'rounded-tr-none'
+                                  : 'rounded-tl-none'
+                                : ''
+                            } ${
+                              isFirstInGroup && !isLastInGroup
+                                ? msg.sender_type === 'agent'
+                                  ? 'rounded-tr-none'
+                                  : 'rounded-tl-none'
+                                : ''
+                            } ${
+                              !isFirstInGroup && isLastInGroup
+                                ? msg.sender_type === 'agent'
+                                  ? 'rounded-br-none'
+                                  : 'rounded-bl-none'
+                                : ''
+                            }`}
+                          >
+                            {isFirstInGroup && (msg.sender_type === 'bot' || msg.sender_type === 'agent') && (
+                              <div className="text-xs font-medium mb-1">
+                                {msg.sender_type === 'agent' ? 'You' : 'Bot'}
+                              </div>
                             )}
-                          </div>
-                          
-                          <div className="text-xs mt-1 opacity-70">
-                            {format(new Date(msg.created_at), 'h:mm a')}
+                            
+                            <div className="text-sm break-words">
+                              {msg.sender_type === 'bot' ? (
+                                <div dangerouslySetInnerHTML={{ __html: msg.message }} />
+                              ) : (
+                                msg.message
+                              )}
+                            </div>
+                            
+                            <div className="text-xs mt-1 opacity-70 text-right">
+                              {format(new Date(msg.created_at), 'h:mm a')}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <div ref={messagesEndRef} />
                   </div>
                 )}
               </div>
               
+              {/* Typing indicator */}
+              {isTyping && (
+                <div className="px-4 py-2 text-gray-500 text-sm animate-pulse flex items-center">
+                  <div className="flex space-x-1 mr-2">
+                    <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                  <span>Sending message...</span>
+                </div>
+              )}
+              
               {/* Message input */}
               <div className="bg-white border-t border-gray-200 p-4">
                 <form onSubmit={handleSendMessage} className="flex">
                   <input
+                    ref={inputRef}
                     type="text"
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
                     placeholder="Type your message..."
-                    className="flex-1 border border-gray-300 rounded-l-md px-4 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className="flex-1 border border-gray-300 rounded-l-md px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <button
                     type="submit"
                     disabled={!messageText.trim()}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded-r-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300"
+                    className="bg-indigo-600 text-white px-4 py-2.5 rounded-r-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300 transition-colors"
                   >
                     <Send className="h-5 w-5" />
                   </button>
@@ -679,12 +961,20 @@ const LiveChat: React.FC = () => {
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <MessageCircle className="h-16 w-16 text-gray-300 mb-4" />
-              <h2 className="text-xl font-medium mb-2">No conversation selected</h2>
-              <p className="text-sm max-w-md text-center">
-                Select a conversation from the sidebar or wait for new visitors to start chatting.
-              </p>
+            <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+              <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 max-w-md text-center">
+                <MessageSquare className="h-16 w-16 text-indigo-300 mx-auto mb-4" />
+                <h2 className="text-xl font-medium mb-2 text-gray-800">No conversation selected</h2>
+                <p className="text-sm text-gray-500 mb-6">
+                  {sidebarCollapsed ? 
+                    "Click the message icon to view conversations" : 
+                    "Select a conversation from the sidebar or wait for new visitors to start chatting."}
+                </p>
+                <p className="text-xs text-gray-400 flex items-center justify-center">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Agent mode is {agentMode ? 'active' : 'inactive'}
+                </p>
+              </div>
             </div>
           )}
         </div>
