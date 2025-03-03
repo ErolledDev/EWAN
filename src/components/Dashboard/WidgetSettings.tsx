@@ -98,11 +98,31 @@ const WidgetSettings: React.FC = () => {
   }
   
   return (
-    <div className="p-4 md:p-6">
-      <h1 className="text-2xl font-bold mb-6">Widget Settings</h1>
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Widget Settings</h1>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isSaving}
+          className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+        >
+          {isSaving ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Saving...
+            </>
+          ) : (
+            'Save Settings'
+          )}
+        </button>
+      </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div className="flex items-center mb-4">
               <div className="mr-3 bg-indigo-100 p-2 rounded-full">
@@ -111,7 +131,7 @@ const WidgetSettings: React.FC = () => {
               <h2 className="text-lg font-medium">General Settings</h2>
             </div>
             
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <div className="flex items-center mb-1">
                   <MessageSquare className="h-4 w-4 text-gray-500 mr-2" />
@@ -130,6 +150,23 @@ const WidgetSettings: React.FC = () => {
               </div>
               
               <div>
+                <div className="flex items-center mb-1">
+                  <User className="h-4 w-4 text-gray-500 mr-2" />
+                  <label htmlFor="salesRepresentative" className="block text-sm font-medium text-gray-700">
+                    Sales Representative Name
+                  </label>
+                </div>
+                <input
+                  id="salesRepresentative"
+                  type="text"
+                  value={salesRepresentative}
+                  onChange={(e) => setSalesRepresentative(e.target.value)}
+                  disabled={isSaving}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
+                />
+              </div>
+              
+              <div className="md:col-span-2">
                 <div className="flex items-center mb-1">
                   <Palette className="h-4 w-4 text-gray-500 mr-2" />
                   <label htmlFor="primaryColor" className="block text-sm font-medium text-gray-700">
@@ -159,23 +196,6 @@ const WidgetSettings: React.FC = () => {
                     </div>
                   </div>
                 )}
-              </div>
-              
-              <div>
-                <div className="flex items-center mb-1">
-                  <User className="h-4 w-4 text-gray-500 mr-2" />
-                  <label htmlFor="salesRepresentative" className="block text-sm font-medium text-gray-700">
-                    Sales Representative Name
-                  </label>
-                </div>
-                <input
-                  id="salesRepresentative"
-                  type="text"
-                  value={salesRepresentative}
-                  onChange={(e) => setSalesRepresentative(e.target.value)}
-                  disabled={isSaving}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
-                />
               </div>
             </div>
           </div>
@@ -228,33 +248,6 @@ const WidgetSettings: React.FC = () => {
             </div>
           </div>
           
-          <div>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
-            >
-              {isSaving ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </>
-              ) : (
-                'Save Settings'
-              )}
-            </button>
-            
-            {saveStatus && (
-              <span className={`ml-3 text-sm ${saveStatus.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
-                {saveStatus}
-              </span>
-            )}
-          </div>
-          
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 className="text-lg font-medium mb-4">Installation Code</h3>
             <p className="text-sm text-gray-600 mb-3">
@@ -280,10 +273,16 @@ const WidgetSettings: React.FC = () => {
               )}
             </button>
           </div>
+          
+          {saveStatus && (
+            <div className={`p-4 rounded-md ${saveStatus.includes('Error') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+              {saveStatus}
+            </div>
+          )}
         </div>
         
-        <div className="mt-6 lg:mt-0">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div>
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 sticky top-6">
             <h2 className="text-lg font-medium mb-4">Widget Preview</h2>
             {user && <WidgetPreview userId={user.id} />}
           </div>

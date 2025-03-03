@@ -149,7 +149,7 @@ const AutoReply: React.FC = () => {
   });
   
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Auto Reply</h1>
         
@@ -189,8 +189,8 @@ const AutoReply: React.FC = () => {
             {editingId ? 'Edit Auto Reply' : 'Add New Auto Reply'}
           </h2>
           
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
               <label htmlFor="keywords" className="block text-sm font-medium text-gray-700">
                 Keywords (comma separated)
               </label>
@@ -224,7 +224,7 @@ const AutoReply: React.FC = () => {
               </select>
             </div>
             
-            <div>
+            <div className="md:col-span-2">
               <label htmlFor="response" className="block text-sm font-medium text-gray-700">
                 Response
               </label>
@@ -239,7 +239,7 @@ const AutoReply: React.FC = () => {
               />
             </div>
             
-            <div className="flex space-x-2">
+            <div className="md:col-span-2 flex space-x-2">
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -272,10 +272,10 @@ const AutoReply: React.FC = () => {
       )}
       
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+        <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
           <h2 className="text-lg font-medium">Auto Replies</h2>
           
-          <div className="relative">
+          <div className="relative w-full md:w-64">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-gray-400" />
             </div>
@@ -284,7 +284,7 @@ const AutoReply: React.FC = () => {
               placeholder="Search replies..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
           </div>
         </div>

@@ -72,10 +72,31 @@ const AiMode: React.FC = () => {
   }
   
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">AI Mode</h1>
+    <div className="p-6 max-w-4xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">AI Mode</h1>
+        
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isSaving}
+          className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+        >
+          {isSaving ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Saving...
+            </>
+          ) : (
+            'Save AI Settings'
+          )}
+        </button>
+      </div>
       
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 max-w-3xl">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center mb-6">
           <div className="mr-4 bg-indigo-100 p-3 rounded-full">
             <Bot className="h-6 w-6 text-indigo-600" />
@@ -113,7 +134,7 @@ const AiMode: React.FC = () => {
           </div>
           
           <div className="border-t border-gray-200 pt-6">
-            <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <div className="flex items-center mb-2">
                   <Key className="h-4 w-4 text-gray-500 mr-2" />
@@ -157,7 +178,7 @@ const AiMode: React.FC = () => {
                 </select>
               </div>
               
-              <div>
+              <div className="md:col-span-2">
                 <div className="flex items-center mb-2">
                   <FileText className="h-4 w-4 text-gray-500 mr-2" />
                   <label htmlFor="aiContext" className="block text-sm font-medium text-gray-700">
@@ -179,36 +200,14 @@ const AiMode: React.FC = () => {
               </div>
             </div>
           </div>
-          
-          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-            <div>
-              {saveStatus && (
-                <div className={`text-sm ${saveStatus.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                  {saveStatus.message}
-                </div>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
-            >
-              {isSaving ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </>
-              ) : (
-                'Save AI Settings'
-              )}
-            </button>
-          </div>
         </div>
       </div>
+      
+      {saveStatus && (
+        <div className={`mt-4 p-4 rounded-md ${saveStatus.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+          {saveStatus.message}
+        </div>
+      )}
     </div>
   );
 };
