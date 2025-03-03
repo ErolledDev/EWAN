@@ -16,7 +16,12 @@ import {
   X, 
   ChevronRight,
   UserCircle,
-  Sparkles
+  Sparkles,
+  Search,
+  Filter,
+  ArrowUpRight,
+  Calendar,
+  Lock
 } from 'lucide-react';
 
 const LiveChat: React.FC = () => {
@@ -43,8 +48,11 @@ const LiveChat: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'recent'>('all');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
   
   useEffect(() => {
     if (user) {
@@ -87,6 +95,13 @@ const LiveChat: React.FC = () => {
     }
   }, [messages, currentSession]);
   
+  // Focus input when selecting a conversation
+  useEffect(() => {
+    if (currentSession && messageInputRef.current && agentMode) {
+      messageInputRef.current.focus();
+    }
+  }, [currentSession, agentMode]);
+  
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -104,7 +119,7 @@ const LiveChat: React.FC = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!currentSession || !newMessage.trim()) return;
+    if (!currentSession || !newMessage.trim() || !agentMode) return;
     
     setIsSending(true);
     
@@ -212,12 +227,26 @@ const LiveChat: React.FC = () => {
     }
   };
   
+  // Filter sessions based on search term and filter status
+  const filteredSessions = activeSessions.filter(session => {
+    const visitorIdMatch = session.visitor_id.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (filterStatus === 'recent') {
+      const sessionDate = new Date(session.updated_at);
+      const now = new Date();
+      const diffInHours = (now.getTime() - sessionDate.getTime()) / (1000 * 60 * 60);
+      return visitorIdMatch && diffInHours <= 24;
+    }
+    
+    return visitorIdMatch;
+  });
+  
   const currentMessages = currentSession ? messages[currentSession.id] || [] : [];
   
   return (
     <div className="p-4 md:p-6 h-full flex flex-col max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold">Live Chat</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Live Chat</h1>
         
         <div className="flex flex-wrap items-center gap-4">
           <button
@@ -229,7 +258,7 @@ const LiveChat: React.FC = () => {
             Refresh
           </button>
           
-          <div className="flex items-center">
+          <div className="flex items-center bg-white rounded-md shadow-sm border border-gray-300 px-3 py-1.5">
             <span className="mr-2 text-sm text-gray-700">Agent Mode:</span>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -246,25 +275,83 @@ const LiveChat: React.FC = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 flex-1 min-h-0">
         <div className="md:col-span-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white">
-            <h2 className="font-medium flex items-center">
-              <MessageCircle className="h-4 w-4 text-indigo-600 mr-2" />
+          <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-600 to-indigo-500">
+            <h2 className="font-medium flex items-center text-white">
+              <MessageCircle className="h-4 w-4 mr-2" />
               Active Conversations
+              <span className="ml-auto text-xs bg-white text-indigo-600 px-2 py-1 rounded-full font-bold">
+                {activeSessions.length}
+              </span>
             </h2>
-            <span className="text-xs text-white bg-indigo-600 px-2 py-1 rounded-full">
-              {activeSessions.length} active
-            </span>
+          </div>
+          
+          <div className="p-3 border-b border-gray-200 bg-gray-50">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search conversations..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setFilterStatus('all')}
+                  className={`px-2 py-1 text-xs rounded-md ${
+                    filterStatus === 'all' 
+                      ? 'bg-indigo-100 text-indigo-700 font-medium' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setFilterStatus('recent')}
+                  className={`px-2 py-1 text-xs rounded-md ${
+                    filterStatus === 'recent' 
+                      ? 'bg-indigo-100 text-indigo-700 font-medium' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Last 24h
+                </button>
+              </div>
+              
+              <button
+                onClick={handleRefresh}
+                className="p-1 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors duration-200"
+                title="Refresh conversations"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           
           <div className="divide-y divide-gray-200 overflow-y-auto flex-1">
             {activeSessions.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
-                <AlertCircle className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                <div className="bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
+                  <AlertCircle className="h-8 w-8 text-gray-400" />
+                </div>
                 <p className="text-sm font-medium">No active conversations</p>
                 <p className="text-xs mt-1">Conversations will appear here when visitors start chatting</p>
               </div>
+            ) : filteredSessions.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">
+                <div className="bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
+                  <Search className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-sm font-medium">No matching conversations</p>
+                <p className="text-xs mt-1">Try a different search term or filter</p>
+              </div>
             ) : (
-              activeSessions.map((session) => (
+              filteredSessions.map((session) => (
                 <div key={session.id} className="relative">
                   <button
                     onClick={() => setCurrentSession(session.id)}
@@ -352,20 +439,32 @@ const LiveChat: React.FC = () => {
         <div className="md:col-span-3 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col min-h-0">
           {!currentSession ? (
             <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-6">
-              <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center mb-4">
-                <MessageCircle className="h-8 w-8 text-indigo-600" />
+              <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center mb-4">
+                <MessageCircle className="h-10 w-10 text-indigo-600" />
               </div>
-              <p className="text-lg font-medium">Select a conversation to start chatting</p>
-              <p className="text-sm mt-2 text-center max-w-md">
+              <p className="text-lg font-medium text-gray-700">Select a conversation to start chatting</p>
+              <p className="text-sm mt-2 text-center max-w-md text-gray-500">
                 When you select a conversation, you'll be able to see the chat history and respond to the visitor.
               </p>
+              
+              {activeSessions.length === 0 && (
+                <div className="mt-8 p-4 bg-indigo-50 rounded-lg border border-indigo-100 max-w-md">
+                  <h3 className="text-sm font-medium text-indigo-800 flex items-center">
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    No active conversations
+                  </h3>
+                  <p className="mt-1 text-xs text-indigo-700">
+                    Conversations will appear here when visitors start chatting with your widget.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <>
               <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-white">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="font-medium flex items-center">
+                    <h2 className="font-medium flex items-center text-gray-800">
                       <span className="mr-2">Chat with Visitor {currentSession.visitor_id.substring(0, 8)}</span>
                       <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full flex items-center">
                         <span className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></span>
@@ -373,7 +472,7 @@ const LiveChat: React.FC = () => {
                       </span>
                     </h2>
                     <div className="text-xs text-gray-500 mt-1 flex items-center">
-                      <Clock className="h-3 w-3 mr-1" />
+                      <Calendar className="h-3 w-3 mr-1" />
                       Started {format(new Date(currentSession.created_at), 'MMM d, yyyy h:mm a')}
                     </div>
                   </div>
@@ -412,54 +511,79 @@ const LiveChat: React.FC = () => {
               <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
                 {currentMessages.length === 0 ? (
                   <div className="text-gray-500 text-center py-8">
-                    <MessageCircle className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <div className="bg-white rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3 shadow-sm">
+                      <MessageCircle className="h-8 w-8 text-gray-400" />
+                    </div>
                     <p className="font-medium">No messages yet</p>
                     <p className="text-sm mt-1">Messages will appear here when the visitor starts chatting</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {currentMessages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`flex ${
-                          message.sender_type === 'user' ? 'justify-start' : 'justify-end'
-                        }`}
-                      >
-                        <div
-                          className={`max-w-[70%] rounded-lg px-4 py-2 shadow-sm transition-all duration-300 hover:shadow-md ${
-                            message.sender_type === 'user'
-                              ? 'bg-white text-gray-800 border border-gray-200'
-                              : message.sender_type === 'bot'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-indigo-600 text-white'
-                          }`}
-                        >
-                          <div className="text-xs font-medium mb-1 flex items-center">
-                            {message.sender_type === 'user' ? (
-                              <>
-                                <UserCircle className="h-3 w-3 mr-1" />
-                                Visitor
-                              </>
-                            ) : message.sender_type === 'bot' ? (
-                              <>
-                                <Sparkles className="h-3 w-3 mr-1" />
-                                Bot
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                You
-                              </>
-                            )}
+                    {currentMessages.map((message, index) => {
+                      // Check if this is the first message of the day or the first message overall
+                      const showDateSeparator = index === 0 || (
+                        index > 0 && 
+                        new Date(message.created_at).toDateString() !== 
+                        new Date(currentMessages[index - 1].created_at).toDateString()
+                      );
+                      
+                      return (
+                        <React.Fragment key={message.id}>
+                          {showDateSeparator && (
+                            <div className="flex items-center justify-center my-4">
+                              <div className="bg-gray-200 h-px flex-grow"></div>
+                              <span className="px-2 text-xs text-gray-500 font-medium">
+                                {format(new Date(message.created_at), 'MMMM d, yyyy')}
+                              </span>
+                              <div className="bg-gray-200 h-px flex-grow"></div>
+                            </div>
+                          )}
+                          
+                          <div
+                            className={`flex ${
+                              message.sender_type === 'user' ? 'justify-start' : 'justify-end'
+                            }`}
+                          >
+                            <div
+                              className={`max-w-[70%] rounded-lg px-4 py-2 shadow-sm transition-all duration-300 hover:shadow-md ${
+                                message.sender_type === 'user'
+                                  ? 'bg-white text-gray-800 border border-gray-200'
+                                  : message.sender_type === 'bot'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-indigo-600 text-white'
+                              }`}
+                            >
+                              <div className="text-xs font-medium mb-1 flex items-center">
+                                {message.sender_type === 'user' ? (
+                                  <>
+                                    <UserCircle className="h-3 w-3 mr-1" />
+                                    Visitor
+                                  </>
+                                ) : message.sender_type === 'bot' ? (
+                                  <>
+                                    <Sparkles className="h-3 w-3 mr-1" />
+                                    Bot
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    You
+                                  </>
+                                )}
+                              </div>
+                              <div 
+                                className="whitespace-pre-wrap"
+                                dangerouslySetInnerHTML={{ __html: message.message }}
+                              />
+                              <div className="text-xs mt-1 opacity-70 flex items-center justify-end">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {format(new Date(message.created_at), 'h:mm a')}
+                              </div>
+                            </div>
                           </div>
-                          <div className="whitespace-pre-wrap">{message.message}</div>
-                          <div className="text-xs mt-1 opacity-70 flex items-center justify-end">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {format(new Date(message.created_at), 'h:mm a')}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                        </React.Fragment>
+                      );
+                    })}
                     {isTyping && (
                       <div className="flex justify-end">
                         <div className="bg-gray-100 text-gray-500 rounded-lg px-4 py-2 max-w-[70%] shadow-sm">
@@ -477,19 +601,34 @@ const LiveChat: React.FC = () => {
               </div>
               
               <div className="p-4 border-t border-gray-200 bg-white">
+                {!agentMode ? (
+                  <div className="bg-gray-100 rounded-md p-3 mb-3 flex items-center justify-center text-gray-600">
+                    <Lock className="h-4 w-4 mr-2" />
+                    <span className="text-sm">Agent mode is disabled. Enable it to send messages.</span>
+                  </div>
+                ) : null}
+                
                 <form onSubmit={handleSendMessage} className="flex">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type your message..."
-                    disabled={isSending}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 transition-all duration-200"
-                  />
+                  <div className="relative flex-1">
+                    <input
+                      ref={messageInputRef}
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder={agentMode ? "Type your message..." : "Enable agent mode to send messages"}
+                      disabled={isSending || !agentMode}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-l-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 transition-all duration-200"
+                    />
+                    {newMessage.length > 0 && (
+                      <div className="absolute right-2 bottom-2 text-xs text-gray-400">
+                        {newMessage.length} characters
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="submit"
-                    disabled={isSending || !newMessage.trim()}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-r-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-all duration-200"
+                    disabled={isSending || !newMessage.trim() || !agentMode}
+                    className="inline-flex items-center px-6 py-3 border border-transparent rounded-r-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-all duration-200"
                   >
                     {isSending ? (
                       <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -501,6 +640,33 @@ const LiveChat: React.FC = () => {
                     )}
                   </button>
                 </form>
+                
+                <div className="mt-2 flex justify-between items-center text-xs text-gray-500">
+                  <div className="flex items-center">
+                    {agentMode ? (
+                      <span className="text-green-600 flex items-center">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Agent mode active
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 flex items-center">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        Agent mode inactive
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <Clock className="h-3 w-3 mr-1" />
+                    <span>Last updated: {formatTimeDifference(currentSession.updated_at)}</span>
+                  </div>
+                </div>
+                
+                {agentMode && (
+                  <div className="mt-2 text-xs text-gray-500">
+                    <p>HTML formatting is supported (e.g., &lt;b&gt;bold&lt;/b&gt;, &lt;a href="..."&gt;link&lt;/a&gt;)</p>
+                  </div>
+                )}
               </div>
             </>
           )}
