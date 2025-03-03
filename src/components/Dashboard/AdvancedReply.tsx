@@ -25,7 +25,6 @@ const AdvancedReply: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
   
   useEffect(() => {
     if (user) {
@@ -69,7 +68,6 @@ const AdvancedReply: React.FC = () => {
       setResponse('');
       setResponseType('text');
       setButtonText('');
-      setShowForm(false);
     } catch (error) {
       console.error('Error saving advanced reply:', error);
     } finally {
@@ -84,7 +82,6 @@ const AdvancedReply: React.FC = () => {
     setResponseType(reply.response_type);
     setButtonText(reply.button_text || '');
     setEditingId(reply.id);
-    setShowForm(true);
   };
   
   const handleCancel = () => {
@@ -94,7 +91,6 @@ const AdvancedReply: React.FC = () => {
     setResponseType('text');
     setButtonText('');
     setEditingId(null);
-    setShowForm(false);
   };
   
   const handleDelete = async (id: string) => {
@@ -187,138 +183,128 @@ const AdvancedReply: React.FC = () => {
             <Download className="h-4 w-4 mr-2" />
             Export
           </button>
-          
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            {showForm ? 'Hide Form' : 'Add New Reply'}
-          </button>
         </div>
       </div>
       
-      {showForm && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
-          <h2 className="text-lg font-medium mb-4">
-            {editingId ? 'Edit Advanced Reply' : 'Add New Advanced Reply'}
-          </h2>
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
+        <h2 className="text-lg font-medium mb-4">
+          {editingId ? 'Edit Advanced Reply' : 'Add New Advanced Reply'}
+        </h2>
+        
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="md:col-span-2">
+            <label htmlFor="keywords" className="block text-sm font-medium text-gray-700">
+              Keywords (comma separated)
+            </label>
+            <input
+              id="keywords"
+              type="text"
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+              placeholder="pricing, cost, price"
+              required
+              disabled={isSubmitting}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
+            />
+          </div>
           
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label htmlFor="matchingType" className="block text-sm font-medium text-gray-700">
+              Matching Type
+            </label>
+            <select
+              id="matchingType"
+              value={matchingType}
+              onChange={(e) => setMatchingType(e.target.value as any)}
+              disabled={isSubmitting}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
+            >
+              <option value="word_match">Word Match</option>
+              <option value="fuzzy_match">Fuzzy Match</option>
+              <option value="regex">Regular Expression</option>
+              <option value="synonym_match">Synonym Match</option>
+            </select>
+          </div>
+          
+          <div>
+            <label htmlFor="responseType" className="block text-sm font-medium text-gray-700">
+              Response Type
+            </label>
+            <select
+              id="responseType"
+              value={responseType}
+              onChange={(e) => setResponseType(e.target.value as 'text' | 'url')}
+              disabled={isSubmitting}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
+            >
+              <option value="text">Text (HTML allowed)</option>
+              <option value="url">URL</option>
+            </select>
+          </div>
+          
+          <div className="md:col-span-2">
+            <label htmlFor="response" className="block text-sm font-medium text-gray-700">
+              Response {responseType === 'url' ? 'URL' : 'Text'}
+            </label>
+            <textarea
+              id="response"
+              value={response}
+              onChange={(e) => setResponse(e.target.value)}
+              rows={4}
+              required
+              disabled={isSubmitting}
+              placeholder={responseType === 'url' ? 'https://example.com/pricing' : '<p>Here is our pricing information...</p>'}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
+            />
+          </div>
+          
+          {responseType === 'url' && (
             <div className="md:col-span-2">
-              <label htmlFor="keywords" className="block text-sm font-medium text-gray-700">
-                Keywords (comma separated)
+              <label htmlFor="buttonText" className="block text-sm font-medium text-gray-700">
+                Button Text
               </label>
               <input
-                id="keywords"
+                id="buttonText"
                 type="text"
-                value={keywords}
-                onChange={(e) => setKeywords(e.target.value)}
-                placeholder="pricing, cost, price"
-                required
+                value={buttonText}
+                onChange={(e) => setButtonText(e.target.value)}
+                placeholder="View Pricing"
                 disabled={isSubmitting}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
               />
             </div>
+          )}
+          
+          <div className="md:col-span-2 flex space-x-2">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {editingId ? 'Updating...' : 'Adding...'}
+                </>
+              ) : (
+                <>{editingId ? 'Update' : 'Add'}</>
+              )}
+            </button>
             
-            <div>
-              <label htmlFor="matchingType" className="block text-sm font-medium text-gray-700">
-                Matching Type
-              </label>
-              <select
-                id="matchingType"
-                value={matchingType}
-                onChange={(e) => setMatchingType(e.target.value as any)}
-                disabled={isSubmitting}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
-              >
-                <option value="word_match">Word Match</option>
-                <option value="fuzzy_match">Fuzzy Match</option>
-                <option value="regex">Regular Expression</option>
-                <option value="synonym_match">Synonym Match</option>
-              </select>
-            </div>
-            
-            <div>
-              <label htmlFor="responseType" className="block text-sm font-medium text-gray-700">
-                Response Type
-              </label>
-              <select
-                id="responseType"
-                value={responseType}
-                onChange={(e) => setResponseType(e.target.value as 'text' | 'url')}
-                disabled={isSubmitting}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
-              >
-                <option value="text">Text (HTML allowed)</option>
-                <option value="url">URL</option>
-              </select>
-            </div>
-            
-            <div className="md:col-span-2">
-              <label htmlFor="response" className="block text-sm font-medium text-gray-700">
-                Response {responseType === 'url' ? 'URL' : 'Text'}
-              </label>
-              <textarea
-                id="response"
-                value={response}
-                onChange={(e) => setResponse(e.target.value)}
-                rows={4}
-                required
-                disabled={isSubmitting}
-                placeholder={responseType === 'url' ? 'https://example.com/pricing' : '<p>Here is our pricing information...</p>'}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
-              />
-            </div>
-            
-            {responseType === 'url' && (
-              <div className="md:col-span-2">
-                <label htmlFor="buttonText" className="block text-sm font-medium text-gray-700">
-                  Button Text
-                </label>
-                <input
-                  id="buttonText"
-                  type="text"
-                  value={buttonText}
-                  onChange={(e) => setButtonText(e.target.value)}
-                  placeholder="View Pricing"
-                  disabled={isSubmitting}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
-                />
-              </div>
-            )}
-            
-            <div className="md:col-span-2 flex space-x-2">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    {editingId ? 'Updating...' : 'Adding...'}
-                  </>
-                ) : (
-                  <>{editingId ? 'Update' : 'Add'}</>
-                )}
-              </button>
-              
-              <button
-                type="button"
-                onClick={handleCancel}
-                disabled={isSubmitting}
-                className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={isSubmitting}
+              className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
       
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
@@ -343,13 +329,6 @@ const AdvancedReply: React.FC = () => {
             <AlertCircle className="h-12 w-12 mx-auto text-gray-400 mb-2" />
             <p className="text-lg font-medium">No advanced replies yet</p>
             <p className="mt-1">Add your first advanced reply to get started</p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Advanced Reply
-            </button>
           </div>
         ) : filteredReplies.length === 0 ? (
           <div className="p-6 text-center text-gray-500">
