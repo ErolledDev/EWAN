@@ -17,6 +17,7 @@ interface ChatState {
   sendMessage: (sessionId: string, message: string, senderType: 'user' | 'bot' | 'agent') => Promise<void>;
   
   toggleAgentMode: () => void;
+  closeSession: (sessionId: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -37,6 +38,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (error) throw error;
       
       set({ activeSessions: data as ChatSession[] });
+      
+      // If we have a current session, make sure it's still in the active sessions
+      const currentSession = get().currentSession;
+      if (currentSession) {
+        const stillActive = data.some(session => session.id === currentSession.id);
+        if (!stillActive) {
+          set({ currentSession: null });
+        }
+      }
     } catch (error) {
       console.error('Error fetching chat sessions:', error);
     }
@@ -75,6 +85,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
   
   setCurrentSession: (sessionId: string) => {
+    if (!sessionId) {
+      set({ currentSession: null });
+      return;
+    }
+    
     const session = get().activeSessions.find(s => s.id === sessionId);
     if (session) {
       set({ currentSession: session });
@@ -146,4 +161,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
   toggleAgentMode: () => {
     set({ agentMode: !get().agentMode });
   },
+  
+  closeSession: async (sessionId: string) => {
+    try {
+      // Update the session status to 'closed'
+      const { error } = await supabase
+        .from('chat_sessions')
+        .update({
+          status: 'closed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', sessionId);
+      
+      if (error) throw error;
+      
+      // Remove the session from active sessions
+      set({
+        activeSessions: get().activeSessions.filter(session => session.id !== sessionId)
+      });
+      
+      // If this was the current session, clear it
+      if (get().currentSession?.id === sessionId) {
+        set({ currentSession: null });
+      }
+      
+      return;
+    } catch (error) {
+      console.error('Error closing chat session:', error);
+      throw error;
+    }
+  }
 }));
