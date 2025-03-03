@@ -31,7 +31,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         .from('chat_sessions')
         .select('*')
         .eq('user_id', userId)
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .order('updated_at', { ascending: false });
       
       if (error) throw error;
       
@@ -103,6 +104,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   
   sendMessage: async (sessionId: string, message: string, senderType: 'user' | 'bot' | 'agent') => {
     try {
+      // First update the session's updated_at timestamp
+      await supabase
+        .from('chat_sessions')
+        .update({
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', sessionId);
+      
+      // Then insert the new message
       const { data, error } = await supabase
         .from('chat_messages')
         .insert({
@@ -125,8 +135,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
           [sessionId]: [...currentMessages, newMessage]
         }
       });
+      
+      return;
     } catch (error) {
       console.error('Error sending message:', error);
+      throw error;
     }
   },
   

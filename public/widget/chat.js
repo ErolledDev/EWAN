@@ -106,6 +106,7 @@
       this.advancedReplies = [];
       this.sessionId = null;
       this.visitorId = localStorage.getItem('chat_visitor_id') || generateId();
+      this.messagePollingInterval = null;
       
       // Save visitor ID
       localStorage.setItem('chat_visitor_id', this.visitorId);
@@ -318,6 +319,63 @@
     toggleChat() {
       this.isOpen = !this.isOpen;
       this.render();
+      
+      if (this.isOpen) {
+        // Start polling for new messages when chat is opened
+        this.startMessagePolling();
+      } else {
+        // Stop polling when chat is closed
+        this.stopMessagePolling();
+      }
+    }
+    
+    startMessagePolling() {
+      if (this.sessionId) {
+        // Poll for new messages every 3 seconds
+        this.messagePollingInterval = setInterval(() => {
+          this.fetchMessages();
+        }, 3000);
+      }
+    }
+    
+    stopMessagePolling() {
+      if (this.messagePollingInterval) {
+        clearInterval(this.messagePollingInterval);
+        this.messagePollingInterval = null;
+      }
+    }
+    
+    async fetchMessages() {
+      if (!this.sessionId) return;
+      
+      try {
+        const response = await fetch(`${this.supabase.url}/rest/v1/chat_messages?chat_session_id=eq.${this.sessionId}&order=created_at.asc`, {
+          headers: {
+            'apikey': this.supabase.key,
+            'Authorization': `Bearer ${this.supabase.key}`
+          }
+        });
+        
+        const messagesData = await response.json();
+        
+        if (messagesData && messagesData.length > 0) {
+          // Convert database messages to our format
+          const formattedMessages = messagesData.map(msg => ({
+            id: msg.id,
+            sender: msg.sender_type,
+            text: msg.message,
+            timestamp: new Date(msg.created_at)
+          }));
+          
+          // Only update if we have new messages
+          if (formattedMessages.length !== this.messages.length) {
+            this.messages = formattedMessages;
+            this.render();
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+      }
     }
     
     async createChatSession() {
@@ -344,6 +402,9 @@
           const data = await response.json();
           if (data && data.length > 0) {
             this.sessionId = data[0].id;
+            
+            // Start polling for messages
+            this.startMessagePolling();
             
             // Add welcome message if available
             if (this.settings?.welcome_message) {
@@ -398,6 +459,20 @@
       
       // Save user message to database
       try {
+        // Update session's updated_at timestamp
+        await fetch(`${this.supabase.url}/rest/v1/chat_sessions`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': this.supabase.key,
+            'Authorization': `Bearer ${this.supabase.key}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            updated_at: new Date().toISOString()
+          })
+        });
+        
+        // Save the message
         await fetch(`${this.supabase.url}/rest/v1/chat_messages`, {
           method: 'POST',
           headers: {

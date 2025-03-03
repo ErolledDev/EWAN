@@ -19,27 +19,57 @@ const LiveChat: React.FC = () => {
   } = useChatStore();
   
   const [newMessage, setNewMessage] = useState('');
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
     if (user) {
       fetchSessions(user.id);
+      
+      // Set up polling to refresh sessions every 10 seconds
+      const interval = setInterval(() => {
+        fetchSessions(user.id);
+      }, 10000);
+      
+      setRefreshInterval(interval);
     }
+    
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
   }, [user, fetchSessions]);
   
   useEffect(() => {
     if (currentSession) {
       fetchMessages(currentSession.id);
+      
+      // Set up polling to refresh messages for the current session
+      const messageInterval = setInterval(() => {
+        fetchMessages(currentSession.id);
+      }, 3000);
+      
+      return () => {
+        clearInterval(messageInterval);
+      };
     }
   }, [currentSession, fetchMessages]);
   
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!currentSession || !newMessage.trim()) return;
     
-    // Always send as agent regardless of agent mode toggle
-    sendMessage(currentSession.id, newMessage, 'agent');
-    setNewMessage('');
+    try {
+      // Always send as agent regardless of agent mode toggle
+      await sendMessage(currentSession.id, newMessage, 'agent');
+      setNewMessage('');
+      
+      // Immediately fetch messages to update the UI
+      fetchMessages(currentSession.id);
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
   };
   
   const currentMessages = currentSession ? messages[currentSession.id] || [] : [];
