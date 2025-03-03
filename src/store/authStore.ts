@@ -72,6 +72,8 @@ export const useAuthStore = create<AuthState>()(
         try {
           await supabase.auth.signOut();
           set({ user: null });
+          // Clear local storage to prevent refresh token issues
+          localStorage.removeItem('auth-storage');
         } catch (error) {
           console.error('Error signing out:', error);
         }
@@ -80,24 +82,37 @@ export const useAuthStore = create<AuthState>()(
       getUser: async () => {
         try {
           set({ loading: true });
-          const { data } = await supabase.auth.getUser();
           
-          if (data.user) {
-            set({ 
-              user: {
-                id: data.user.id,
-                email: data.user.email || '',
-                created_at: data.user.created_at || new Date().toISOString(),
-              } 
-            });
-          } else {
-            set({ user: null });
+          // First try to get the user from the current session
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) {
+            console.error('Session error:', sessionError);
+            set({ user: null, loading: false });
+            return;
           }
+          
+          if (sessionData?.session) {
+            const { data } = await supabase.auth.getUser();
+            
+            if (data.user) {
+              set({ 
+                user: {
+                  id: data.user.id,
+                  email: data.user.email || '',
+                  created_at: data.user.created_at || new Date().toISOString(),
+                },
+                loading: false
+              });
+              return;
+            }
+          }
+          
+          // If no session, clear the user
+          set({ user: null, loading: false });
         } catch (error) {
           console.error('Error getting user:', error);
-          set({ user: null });
-        } finally {
-          set({ loading: false });
+          set({ user: null, loading: false });
         }
       },
     }),
