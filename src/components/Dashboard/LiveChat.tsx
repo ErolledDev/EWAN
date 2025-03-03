@@ -689,226 +689,231 @@ const LiveChat: React.FC = () => {
           {currentSession ? (
             <>
               {/* Chat header */}
-              <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between shadow-sm">
-                <div className="flex items-center">
-                  {isMobile && (
+              <div className="bg-white border-b border-gray-200 p-4 flex flex-col shadow-sm">
+                {/* Back button for mobile - centered at the top */}
+                {isMobile && (
+                  <div className="flex justify-center mb-2">
                     <button
                       onClick={handleBackToList}
-                      className="flex items-center mr-3 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700 transition-colors"
+                      className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 transition-colors flex items-center"
                     >
                       <ArrowLeft className="h-4 w-4 mr-1" />
-                      <span className="text-sm font-medium">Back</span>
+                      <span className="text-sm font-medium">Back to conversations</span>
                     </button>
-                  )}
-                  
-                  <div className="bg-indigo-100 rounded-full p-2.5 mr-3">
-                    <UserCircle className="h-5 w-5 text-indigo-600" />
                   </div>
-                  
-                  {isRenaming ? (
-                    <div className="flex items-center">
-                      <input
-                        type="text"
-                        value={visitorName}
-                        onChange={(e) => setVisitorName(e.target.value)}
-                        placeholder="Enter visitor name"
-                        className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                        autoFocus
-                      />
-                      <button
-                        onClick={handleRenameVisitor}
-                        className="ml-2 text-indigo-600 hover:text-indigo-800 transition-colors"
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setIsRenaming(false)}
-                        className="ml-1 text-gray-500 hover:text-gray-700 transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center">
-                      <h2 className="text-lg font-medium truncate max-w-[120px] md:max-w-xs">
-                        {currentSession.metadata?.visitorName || `Visitor ${currentSession.visitor_id.substring(0, 8)}`}
-                      </h2>
-                      <button
-                        onClick={() => setIsRenaming(true)}
-                        className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                  
-                  {currentSession.metadata?.label && (
-                    <span 
-                      className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                      style={{ 
-                        backgroundColor: `${currentSession.metadata.label.color}20`, 
-                        color: currentSession.metadata.label.color 
-                      }}
-                    >
-                      {currentSession.metadata.label.text}
-                    </span>
-                  )}
-                </div>
+                )}
                 
-                {/* Desktop action buttons */}
-                <div className="hidden md:flex items-center space-x-1">
-                  <button
-                    onClick={handleTogglePin}
-                    className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
-                      currentSession.metadata?.pinned ? 'text-indigo-600' : 'text-gray-400'
-                    }`}
-                    title={currentSession.metadata?.pinned ? 'Unpin conversation' : 'Pin conversation'}
-                  >
-                    <Pin className="h-5 w-5" />
-                  </button>
-                  
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowLabelMenu(!showLabelMenu)}
-                      className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
-                        currentSession.metadata?.label ? 'text-indigo-600' : 'text-gray-400'
-                      }`}
-                      title="Manage label"
-                    >
-                      <Tag className="h-5 w-5" />
-                    </button>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center flex-1">
+                    <div className="bg-indigo-100 rounded-full p-2.5 mr-3">
+                      <UserCircle className="h-5 w-5 text-indigo-600" />
+                    </div>
                     
-                    {showLabelMenu && (
-                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 p-4 border border-gray-200">
-                        <h3 className="text-sm font-medium mb-2">Manage Label</h3>
+                    {isRenaming ? (
+                      <div className="flex items-center">
                         <input
                           type="text"
-                          value={labelText}
-                          onChange={(e) => setLabelText(e.target.value)}
-                          placeholder="Label text"
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 mb-2"
+                          value={visitorName}
+                          onChange={(e) => setVisitorName(e.target.value)}
+                          placeholder="Enter visitor name"
+                          className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                          autoFocus
                         />
-                        
-                        <div className="mb-3">
-                          <label className="block text-xs text-gray-500 mb-1">Color</label>
-                          <div className="flex flex-wrap gap-2">
-                            {['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'].map(color => (
+                        <button
+                          onClick={handleRenameVisitor}
+                          className="ml-2 text-indigo-600 hover:text-indigo-800 transition-colors"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setIsRenaming(false)}
+                          className="ml-1 text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <h2 className="text-lg font-medium truncate max-w-[120px] md:max-w-xs">
+                          {currentSession.metadata?.visitorName || `Visitor ${currentSession.visitor_id.substring(0, 8)}`}
+                        </h2>
+                        <button
+                          onClick={() => setIsRenaming(true)}
+                          className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+                    
+                    {currentSession.metadata?.label && (
+                      <span 
+                        className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={{ 
+                          backgroundColor: `${currentSession.metadata.label.color}20`, 
+                          color: currentSession.metadata.label.color 
+                        }}
+                      >
+                        {currentSession.metadata.label.text}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Desktop action buttons */}
+                  <div className="hidden md:flex items-center space-x-1">
+                    <button
+                      onClick={handleTogglePin}
+                      className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
+                        currentSession.metadata?.pinned ? 'text-indigo-600' : 'text-gray-400'
+                      }`}
+                      title={currentSession.metadata?.pinned ? 'Unpin conversation' : 'Pin conversation'}
+                    >
+                      <Pin className="h-5 w-5" />
+                    </button>
+                    
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowLabelMenu(!showLabelMenu)}
+                        className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
+                          currentSession.metadata?.label ? 'text-indigo-600' : 'text-gray-400'
+                        }`}
+                        title="Manage label"
+                      >
+                        <Tag className="h-5 w-5" />
+                      </button>
+                      
+                      {showLabelMenu && (
+                        <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 p-4 border border-gray-200">
+                          <h3 className="text-sm font-medium mb-2">Manage Label</h3>
+                          <input
+                            type="text"
+                            value={labelText}
+                            onChange={(e) => setLabelText(e.target.value)}
+                            placeholder="Label text"
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 mb-2"
+                          />
+                          
+                          <div className="mb-3">
+                            <label className="block text-xs text-gray-500 mb-1">Color</label>
+                            <div className="flex flex-wrap gap-2">
+                              {['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'].map(color => (
+                                <button
+                                  key={color}
+                                  onClick={() => setLabelColor(color)}
+                                  className={`w-6 h-6 rounded-full ${labelColor === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
+                                  style={{ backgroundColor: color }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-between">
+                            <button
+                              onClick={() => setShowLabelMenu(false)}
+                              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            
+                            {currentSession.metadata?.label ? (
                               <button
-                                key={color}
-                                onClick={() => setLabelColor(color)}
-                                className={`w-6 h-6 rounded-full ${labelColor === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
-                                style={{ backgroundColor: color }}
-                              />
-                            ))}
+                                onClick={handleRemoveLabel}
+                                className="px-3 py-1.5 border border-red-300 rounded-md text-sm text-red-700 hover:bg-red-50 transition-colors"
+                              >
+                                Remove
+                              </button>
+                            ) : null}
+                            
+                            <button
+                              onClick={handleAddLabel}
+                              disabled={!labelText.trim()}
+                              className="px-3 py-1.5 bg-indigo-600 rounded-md text-sm text-white hover:bg-indigo-700 disabled:bg-indigo-300 transition-colors"
+                            >
+                              Apply
+                            </button>
                           </div>
                         </div>
-                        
-                        <div className="flex justify-between">
+                      )}
+                    </div>
+                    
+                    <button
+                      onClick={() => setShowNoteEditor(!showNoteEditor)}
+                      className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
+                        currentSession.metadata?.note ? 'text-amber-500' : 'text-gray-400'
+                      }`}
+                      title="Add note"
+                    >
+                      <Edit className="h-5 w-5" />
+                    </button>
+                    
+                    <button
+                      onClick={() => handleCloseSession(currentSession.id)}
+                      className="p-2 rounded-full hover:bg-gray-100 hover:text-red-500 text-gray-400 transition-colors"
+                      title="Close conversation"
+                    >
+                      <Trash className="h-5 w-5" />
+                    </button>
+                  </div>
+                  
+                  {/* Mobile action menu button */}
+                  <div className="md:hidden relative" ref={actionMenuRef}>
+                    <button
+                      onClick={() => setShowActionMenu(!showActionMenu)}
+                      className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
+                    >
+                      <MoreVertical className="h-5 w-5" />
+                    </button>
+                    
+                    {showActionMenu && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200 animate-fadeIn">
+                        <div className="py-1">
                           <button
-                            onClick={() => setShowLabelMenu(false)}
-                            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                            onClick={() => {
+                              handleTogglePin();
+                              setShowActionMenu(false);
+                            }}
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
                           >
-                            Cancel
+                            <Pin className={`h-4 w-4 mr-2 ${currentSession.metadata?.pinned ? 'text-indigo-600' : 'text-gray-400'}`} />
+                            {currentSession.metadata?.pinned ? 'Unpin conversation' : 'Pin conversation'}
                           </button>
                           
-                          {currentSession.metadata?.label ? (
-                            <button
-                              onClick={handleRemoveLabel}
-                              className="px-3 py-1.5 border border-red-300 rounded-md text-sm text-red-700 hover:bg-red-50 transition-colors"
-                            >
-                              Remove
-                            </button>
-                          ) : null}
+                          <button
+                            onClick={() => {
+                              setShowLabelMenu(true);
+                              setShowActionMenu(false);
+                            }}
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                          >
+                            <Tag className={`h-4 w-4 mr-2 ${currentSession.metadata?.label ? 'text-indigo-600' : 'text-gray-400'}`} />
+                            Manage label
+                          </button>
                           
                           <button
-                            onClick={handleAddLabel}
-                            disabled={!labelText.trim()}
-                            className="px-3 py-1.5 bg-indigo-600 rounded-md text-sm text-white hover:bg-indigo-700 disabled:bg-indigo-300 transition-colors"
+                            onClick={() => {
+                              setShowNoteEditor(!showNoteEditor);
+                              setShowActionMenu(false);
+                            }}
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
                           >
-                            Apply
+                            <Edit className={`h-4 w-4 mr-2 ${currentSession.metadata?.note ? 'text-amber-500' : 'text-gray-400'}`} />
+                            {currentSession.metadata?.note ? 'Edit note' : 'Add note'}
+                          </button>
+                          
+                          <button
+                            onClick={() => {
+                              handleCloseSession(currentSession.id);
+                              setShowActionMenu(false);
+                            }}
+                            className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
+                          >
+                            <Trash className="h-4 w-4 mr-2" />
+                            Close conversation
                           </button>
                         </div>
                       </div>
                     )}
                   </div>
-                  
-                  <button
-                    onClick={() => setShowNoteEditor(!showNoteEditor)}
-                    className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
-                      currentSession.metadata?.note ? 'text-amber-500' : 'text-gray-400'
-                    }`}
-                    title="Add note"
-                  >
-                    <Edit className="h-5 w-5" />
-                  </button>
-                  
-                  <button
-                    onClick={() => handleCloseSession(currentSession.id)}
-                    className="p-2 rounded-full hover:bg-gray-100 hover:text-red-500 text-gray-400 transition-colors"
-                    title="Close conversation"
-                  >
-                    <Trash className="h-5 w-5" />
-                  </button>
-                </div>
-                
-                {/* Mobile action menu button */}
-                <div className="md:hidden relative" ref={actionMenuRef}>
-                  <button
-                    onClick={() => setShowActionMenu(!showActionMenu)}
-                    className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
-                  >
-                    <MoreVertical className="h-5 w-5" />
-                  </button>
-                  
-                  {showActionMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200 animate-fadeIn">
-                      <div className="py-1">
-                        <button
-                          onClick={() => {
-                            handleTogglePin();
-                            setShowActionMenu(false);
-                          }}
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                        >
-                          <Pin className={`h-4 w-4 mr-2 ${currentSession.metadata?.pinned ? 'text-indigo-600' : 'text-gray-400'}`} />
-                          {currentSession.metadata?.pinned ? 'Unpin conversation' : 'Pin conversation'}
-                        </button>
-                        
-                        <button
-                          onClick={() => {
-                            setShowLabelMenu(true);
-                            setShowActionMenu(false);
-                          }}
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                        >
-                          <Tag className={`h-4 w-4 mr-2 ${currentSession.metadata?.label ? 'text-indigo-600' : 'text-gray-400'}`} />
-                          Manage label
-                        </button>
-                        
-                        <button
-                          onClick={() => {
-                            setShowNoteEditor(!showNoteEditor);
-                            setShowActionMenu(false);
-                          }}
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                        >
-                          <Edit className={`h-4 w-4 mr-2 ${currentSession.metadata?.note ? 'text-amber-500' : 'text-gray-400'}`} />
-                          {currentSession.metadata?.note ? 'Edit note' : 'Add note'}
-                        </button>
-                        
-                        <button
-                          onClick={() => {
-                            handleCloseSession(currentSession.id);
-                            setShowActionMenu(false);
-                          }}
-                          className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
-                        >
-                          <Trash className="h-4 w-4 mr-2" />
-                          Close conversation
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
               
