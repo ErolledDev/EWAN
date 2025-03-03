@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useWidgetStore } from '../../store/widgetStore';
 import { useAuthStore } from '../../store/authStore';
+import { useNotificationStore } from '../../store/notificationStore';
 import { AlertCircle, Bot, Key, Cpu, FileText } from 'lucide-react';
 
 const AiMode: React.FC = () => {
   const { user } = useAuthStore();
   const { settings, fetchSettings, updateSettings } = useWidgetStore();
+  const { addNotification } = useNotificationStore();
   
   const [aiEnabled, setAiEnabled] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [aiModel, setAiModel] = useState('gpt-3.5-turbo');
   const [aiContext, setAiContext] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   
   useEffect(() => {
     if (user) {
@@ -33,7 +34,6 @@ const AiMode: React.FC = () => {
     if (!user) return;
     
     setIsSaving(true);
-    setSaveStatus(null);
     
     try {
       await updateSettings({
@@ -43,20 +43,19 @@ const AiMode: React.FC = () => {
         ai_context: aiContext,
       });
       
-      setSaveStatus({
+      addNotification({
         type: 'success',
-        message: 'AI settings saved successfully!'
+        title: 'AI settings saved successfully!',
+        duration: 3000,
       });
-      
-      // Clear the success message after 3 seconds
-      setTimeout(() => {
-        setSaveStatus(null);
-      }, 3000);
     } catch (error) {
       console.error('Error saving AI settings:', error);
-      setSaveStatus({
+      
+      addNotification({
         type: 'error',
-        message: 'Failed to save AI settings. Please try again.'
+        title: 'Failed to save AI settings',
+        message: 'Please try again.',
+        duration: 5000,
       });
     } finally {
       setIsSaving(false);
@@ -202,12 +201,6 @@ const AiMode: React.FC = () => {
           </div>
         </div>
       </div>
-      
-      {saveStatus && (
-        <div className={`mt-4 p-4 rounded-md ${saveStatus.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-          {saveStatus.message}
-        </div>
-      )}
     </div>
   );
 };

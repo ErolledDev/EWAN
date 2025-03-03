@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useWidgetStore } from '../../store/widgetStore';
 import { useAuthStore } from '../../store/authStore';
+import { useNotificationStore } from '../../store/notificationStore';
 import { AdvancedReply as AdvancedReplyType } from '../../types';
 import { Plus, Trash, Upload, Download, Edit, Search, AlertCircle, ExternalLink } from 'lucide-react';
 
@@ -15,6 +16,7 @@ const AdvancedReply: React.FC = () => {
     importAdvancedReplies,
     exportAdvancedReplies
   } = useWidgetStore();
+  const { addNotification } = useNotificationStore();
   
   const [keywords, setKeywords] = useState('');
   const [matchingType, setMatchingType] = useState<'word_match' | 'fuzzy_match' | 'regex' | 'synonym_match'>('word_match');
@@ -51,6 +53,12 @@ const AdvancedReply: React.FC = () => {
           button_text: buttonText || undefined,
         });
         setEditingId(null);
+        
+        addNotification({
+          type: 'success',
+          title: 'Advanced reply updated successfully',
+          duration: 3000,
+        });
       } else {
         await addAdvancedReply({
           user_id: user.id,
@@ -59,6 +67,12 @@ const AdvancedReply: React.FC = () => {
           response,
           response_type: responseType,
           button_text: buttonText || undefined,
+        });
+        
+        addNotification({
+          type: 'success',
+          title: 'Advanced reply added successfully',
+          duration: 3000,
         });
       }
       
@@ -70,6 +84,13 @@ const AdvancedReply: React.FC = () => {
       setButtonText('');
     } catch (error) {
       console.error('Error saving advanced reply:', error);
+      
+      addNotification({
+        type: 'error',
+        title: 'Error saving advanced reply',
+        message: 'Please try again.',
+        duration: 5000,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -97,8 +118,21 @@ const AdvancedReply: React.FC = () => {
     setIsDeleting(id);
     try {
       await deleteAdvancedReply(id);
+      
+      addNotification({
+        type: 'success',
+        title: 'Advanced reply deleted successfully',
+        duration: 3000,
+      });
     } catch (error) {
       console.error('Error deleting advanced reply:', error);
+      
+      addNotification({
+        type: 'error',
+        title: 'Error deleting advanced reply',
+        message: 'Please try again.',
+        duration: 5000,
+      });
     } finally {
       setIsDeleting(null);
     }
@@ -121,10 +155,23 @@ const AdvancedReply: React.FC = () => {
           }));
           
           await importAdvancedReplies(formattedData);
+          
+          addNotification({
+            type: 'success',
+            title: 'Advanced replies imported successfully',
+            message: `${formattedData.length} replies imported`,
+            duration: 3000,
+          });
         }
       } catch (error) {
         console.error('Error importing data:', error);
-        alert('Failed to import data. Please check the file format.');
+        
+        addNotification({
+          type: 'error',
+          title: 'Failed to import data',
+          message: 'Please check the file format.',
+          duration: 5000,
+        });
       }
     };
     
@@ -145,6 +192,12 @@ const AdvancedReply: React.FC = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    addNotification({
+      type: 'success',
+      title: 'Advanced replies exported successfully',
+      duration: 3000,
+    });
   };
   
   // Filter advanced replies based on search term
