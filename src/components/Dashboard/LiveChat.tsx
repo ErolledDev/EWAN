@@ -25,7 +25,8 @@ import {
   UserCircle,
   ChevronDown,
   ArrowLeft,
-  Menu
+  Menu,
+  MoreVertical
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
@@ -63,11 +64,13 @@ const LiveChat: React.FC = () => {
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
+  const [showActionMenu, setShowActionMenu] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const filterMenuRef = useRef<HTMLDivElement>(null);
+  const actionMenuRef = useRef<HTMLDivElement>(null);
   
   // Check if screen is mobile
   useEffect(() => {
@@ -97,6 +100,10 @@ const LiveChat: React.FC = () => {
     const handleClickOutside = (event: MouseEvent) => {
       if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
         setShowFilterMenu(false);
+      }
+      
+      if (actionMenuRef.current && !actionMenuRef.current.contains(event.target as Node)) {
+        setShowActionMenu(false);
       }
     };
     
@@ -687,9 +694,10 @@ const LiveChat: React.FC = () => {
                   {isMobile && (
                     <button
                       onClick={handleBackToList}
-                      className="mr-2 p-1 rounded-full hover:bg-gray-100 text-gray-500"
+                      className="flex items-center mr-3 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700 transition-colors"
                     >
-                      <ArrowLeft className="h-5 w-5" />
+                      <ArrowLeft className="h-4 w-4 mr-1" />
+                      <span className="text-sm font-medium">Back</span>
                     </button>
                   )}
                   
@@ -747,7 +755,8 @@ const LiveChat: React.FC = () => {
                   )}
                 </div>
                 
-                <div className="flex items-center space-x-1">
+                {/* Desktop action buttons */}
+                <div className="hidden md:flex items-center space-x-1">
                   <button
                     onClick={handleTogglePin}
                     className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
@@ -840,6 +849,66 @@ const LiveChat: React.FC = () => {
                   >
                     <Trash className="h-5 w-5" />
                   </button>
+                </div>
+                
+                {/* Mobile action menu button */}
+                <div className="md:hidden relative" ref={actionMenuRef}>
+                  <button
+                    onClick={() => setShowActionMenu(!showActionMenu)}
+                    className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
+                  >
+                    <MoreVertical className="h-5 w-5" />
+                  </button>
+                  
+                  {showActionMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200 animate-fadeIn">
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            handleTogglePin();
+                            setShowActionMenu(false);
+                          }}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                        >
+                          <Pin className={`h-4 w-4 mr-2 ${currentSession.metadata?.pinned ? 'text-indigo-600' : 'text-gray-400'}`} />
+                          {currentSession.metadata?.pinned ? 'Unpin conversation' : 'Pin conversation'}
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            setShowLabelMenu(true);
+                            setShowActionMenu(false);
+                          }}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                        >
+                          <Tag className={`h-4 w-4 mr-2 ${currentSession.metadata?.label ? 'text-indigo-600' : 'text-gray-400'}`} />
+                          Manage label
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            setShowNoteEditor(!showNoteEditor);
+                            setShowActionMenu(false);
+                          }}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                        >
+                          <Edit className={`h-4 w-4 mr-2 ${currentSession.metadata?.note ? 'text-amber-500' : 'text-gray-400'}`} />
+                          {currentSession.metadata?.note ? 'Edit note' : 'Add note'}
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            handleCloseSession(currentSession.id);
+                            setShowActionMenu(false);
+                          }}
+                          className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
+                        >
+                          <Trash className="h-4 w-4 mr-2" />
+                          Close conversation
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               
