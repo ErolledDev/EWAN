@@ -58,17 +58,9 @@ npm run dev
 
 ### Building the Widget
 
-To build the widget for production:
+The widget is now implemented as a standalone JavaScript file that doesn't require a build step. The file is located at `public/widget/chat.js`.
 
-```bash
-npm run build:widget
-```
-
-This will create a `dist/widget` directory with the widget files. The main file to include on websites is `chat.js`.
-
-## Testing the Widget
-
-After building the widget, you can test it by opening the `public/widget-demo.html` file in your browser. This file demonstrates how to include and initialize the widget on a website.
+To test the widget, open the `public/widget-demo.html` file in your browser.
 
 ## Database Schema
 
