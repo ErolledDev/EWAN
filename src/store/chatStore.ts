@@ -23,7 +23,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeSessions: [],
   currentSession: null,
   messages: {},
-  agentMode: false,
+  agentMode: true, // Set default to true
   
   fetchSessions: async (userId: string) => {
     try {

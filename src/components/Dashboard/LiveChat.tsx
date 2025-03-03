@@ -37,6 +37,7 @@ const LiveChat: React.FC = () => {
     
     if (!currentSession || !newMessage.trim()) return;
     
+    // Always send as agent regardless of agent mode toggle
     sendMessage(currentSession.id, newMessage, 'agent');
     setNewMessage('');
   };
