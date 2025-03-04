@@ -37,6 +37,9 @@
       this.isTyping = false;
       this.initialized = false;
       this.messageSubscription = null;
+      this.messagePollingInterval = null;
+      this.lastMessageTimestamp = 0; // Track the timestamp of the last message
+      this.pendingMessageIds = new Set(); // Track messages being sent to avoid duplication
       
       // Store visitor ID
       localStorage.setItem('chat_visitor_id', this.visitorId);
@@ -546,6 +549,12 @@
         if (response.ok) {
           const messages = await response.json();
           
+          // Update the last message timestamp
+          if (messages.length > 0) {
+            const latestTimestamp = Math.max(...messages.map(m => new Date(m.created_at).getTime()));
+            this.lastMessageTimestamp = latestTimestamp;
+          }
+          
           this.messages = messages.map(msg => ({
             id: msg.id,
             sender: msg.sender_type,
@@ -563,18 +572,12 @@
     subscribeToMessages() {
       if (!this.sessionId) return;
       
-      // Create EventSource for SSE (Server-Sent Events)
-      const evtSource = new EventSource(
-        `${this.supabaseUrl}/rest/v1/chat_messages?chat_session_id=eq.${this.sessionId}&order=created_at.desc&limit=1`,
-        {
-          headers: {
-            'apikey': this.supabaseKey,
-            'Authorization': `Bearer ${this.supabaseKey}`
-          }
-        }
-      );
+      // Clean up any existing polling interval
+      if (this.messagePollingInterval) {
+        clearInterval(this.messagePollingInterval);
+      }
       
-      // Set up polling for new messages as a fallback
+      // Set up polling for new messages
       this.messagePollingInterval = setInterval(() => {
         this.checkForNewMessages();
       }, 3000);
@@ -585,13 +588,11 @@
       
       try {
         // Get the latest message timestamp
-        const latestTimestamp = this.messages.length > 0 
-          ? Math.max(...this.messages.map(m => new Date(m.timestamp).getTime()))
-          : 0;
+        const timestamp = new Date(this.lastMessageTimestamp).toISOString();
         
         // Fetch only newer messages
         const response = await fetch(
-          `${this.supabaseUrl}/rest/v1/chat_messages?chat_session_id=eq.${this.sessionId}&created_at=gt.${new Date(latestTimestamp).toISOString()}&order=created_at.asc`, 
+          `${this.supabaseUrl}/rest/v1/chat_messages?chat_session_id=eq.${this.sessionId}&created_at=gt.${timestamp}&order=created_at.asc`, 
           {
             headers: {
               'apikey': this.supabaseKey,
@@ -604,11 +605,17 @@
           const newMessages = await response.json();
           
           if (newMessages && newMessages.length > 0) {
-            // Filter out messages we already have (by ID)
+            // Filter out messages we already have (by ID) and pending messages
             const existingIds = new Set(this.messages.map(m => m.id));
-            const uniqueNewMessages = newMessages.filter(msg => !existingIds.has(msg.id));
+            const uniqueNewMessages = newMessages.filter(msg => 
+              !existingIds.has(msg.id) && !this.pendingMessageIds.has(msg.id)
+            );
             
             if (uniqueNewMessages.length > 0) {
+              // Update the last message timestamp
+              const latestTimestamp = Math.max(...uniqueNewMessages.map(m => new Date(m.created_at).getTime()));
+              this.lastMessageTimestamp = Math.max(this.lastMessageTimestamp, latestTimestamp);
+              
               // Add new messages
               const formattedNewMessages = uniqueNewMessages.map(msg => ({
                 id: msg.id,
@@ -800,8 +807,12 @@
         }
       }
 
+      // Generate a temporary ID for this message
+      const tempId = generateId();
+      this.pendingMessageIds.add(tempId);
+
       // Add user message to UI
-      const userMessage = { id: generateId(), sender: 'user', text, timestamp: new Date() };
+      const userMessage = { id: tempId, sender: 'user', text, timestamp: new Date() };
       this.messages.push(userMessage);
       this.updateChatContent();
 
@@ -818,12 +829,13 @@
         });
         
         // Save user message
-        await fetch(`${this.supabaseUrl}/rest/v1/chat_messages`, {
+        const messageResponse = await fetch(`${this.supabaseUrl}/rest/v1/chat_messages`, {
           method: 'POST',
           headers: {
             'apikey': this.supabaseKey,
             'Authorization': `Bearer ${this.supabaseKey}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
           },
           body: JSON.stringify({
             chat_session_id: this.sessionId,
@@ -832,8 +844,36 @@
             created_at: new Date().toISOString()
           })
         });
+        
+        if (messageResponse.ok) {
+          const data = await messageResponse.json();
+          if (data && data[0] && data[0].id) {
+            // Update the message ID in our local state
+            this.messages = this.messages.map(msg => 
+              msg.id === tempId ? { ...msg, id: data[0].id } : msg
+            );
+            
+            // Update the last message timestamp
+            this.lastMessageTimestamp = Math.max(
+              this.lastMessageTimestamp, 
+              new Date(data[0].created_at).getTime()
+            );
+            
+            // Remove from pending messages
+            this.pendingMessageIds.delete(tempId);
+            // Add the real ID to prevent duplication
+            this.pendingMessageIds.add(data[0].id);
+            
+            // After a while, remove from pending to allow future messages with same ID
+            setTimeout(() => {
+              this.pendingMessageIds.delete(data[0].id);
+            }, 10000);
+          }
+        }
       } catch (error) {
         console.error('Error saving user message:', error);
+        // Remove from pending messages on error
+        this.pendingMessageIds.delete(tempId);
       }
 
       // Process the message to find a reply
@@ -908,17 +948,23 @@
         return;
       }
       
-      const botMessage = { id: generateId(), sender: 'bot', text, timestamp: new Date() };
+      // Generate a temporary ID for this message
+      const tempId = generateId();
+      this.pendingMessageIds.add(tempId);
+      
+      // Add bot message to UI
+      const botMessage = { id: tempId, sender: 'bot', text, timestamp: new Date() };
       this.messages.push(botMessage);
       this.updateChatContent();
 
       try {
-        await fetch(`${this.supabaseUrl}/rest/v1/chat_messages`, {
+        const messageResponse = await fetch(`${this.supabaseUrl}/rest/v1/chat_messages`, {
           method: 'POST',
           headers: {
             'apikey': this.supabaseKey,
             'Authorization': `Bearer ${this.supabaseKey}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
           },
           body: JSON.stringify({
             chat_session_id: this.sessionId,
@@ -927,8 +973,36 @@
             created_at: new Date().toISOString()
           })
         });
+        
+        if (messageResponse.ok) {
+          const data = await messageResponse.json();
+          if (data && data[0] && data[0].id) {
+            // Update the message ID in our local state
+            this.messages = this.messages.map(msg => 
+              msg.id === tempId ? { ...msg, id: data[0].id } : msg
+            );
+            
+            // Update the last message timestamp
+            this.lastMessageTimestamp = Math.max(
+              this.lastMessageTimestamp, 
+              new Date(data[0].created_at).getTime()
+            );
+            
+            // Remove from pending messages
+            this.pendingMessageIds.delete(tempId);
+            // Add the real ID to prevent duplication
+            this.pendingMessageIds.add(data[0].id);
+            
+            // After a while, remove from pending to allow future messages with same ID
+            setTimeout(() => {
+              this.pendingMessageIds.delete(data[0].id);
+            }, 10000);
+          }
+        }
       } catch (error) {
         console.error('Error saving bot message:', error);
+        // Remove from pending messages on error
+        this.pendingMessageIds.delete(tempId);
       }
     }
   }
