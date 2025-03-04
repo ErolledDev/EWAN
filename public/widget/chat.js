@@ -60,22 +60,25 @@
       .cw-resize-none { resize: none; }
       .cw-whitespace-pre-wrap { white-space: pre-wrap; }
       .cw-break-words { overflow-wrap: break-word; }
+      .cw-hidden { display: none; }
 
-      /* Smooth animations */
-      .cw-animate-slide-up {
-        animation: cw-slide-up 0.3s ease-out;
+      /* Chat window transition */
+      .cw-chat-window {
+        visibility: hidden;
+        opacity: 0;
+        transform: translateY(20px);
+        transition: visibility 0s 0.3s, opacity 0.3s ease, transform 0.3s ease;
+        pointer-events: none;
       }
-      @keyframes cw-slide-up {
-        from { transform: translateY(20px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
+      .cw-chat-window.cw-open {
+        visibility: visible;
+        opacity: 1;
+        transform: translateY(0);
+        transition: visibility 0s, opacity 0.3s ease, transform 0.3s ease;
+        pointer-events: auto;
       }
-      .cw-animate-slide-in {
-        animation: cw-slide-in 0.3s ease-in-out;
-      }
-      @keyframes cw-slide-in {
-        from { transform: translateY(10px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-      }
+
+      /* Typing indicator */
       .cw-typing-indicator span {
         height: 8px;
         width: 8px;
@@ -199,6 +202,16 @@
       this.isTyping = false;
       this.messagePollingInterval = null;
       
+      // DOM elements
+      this.container = null;
+      this.chatButton = null;
+      this.chatWindow = null;
+      this.header = null;
+      this.messagesContainer = null;
+      this.typingIndicator = null;
+      this.form = null;
+      this.textarea = null;
+      
       localStorage.setItem('chat_visitor_id', this.visitorId);
       
       this.supabase = {
@@ -215,7 +228,8 @@
       this.container.className = 'cw-fixed cw-bottom-4 cw-right-4 cw-z-50 cw-flex cw-flex-col cw-items-end';
       document.body.appendChild(this.container);
       await this.fetchWidgetData();
-      this.render();
+      this.createChatElements();
+      this.updateUI();
     }
 
     async fetchWidgetData() {
@@ -240,174 +254,197 @@
       }
     }
 
-    render() {
+    createChatElements() {
       if (!this.settings) return;
-      this.container.innerHTML = '';
 
       // Chat Button
-      const chatButton = document.createElement('button');
-      chatButton.className = 'cw-flex cw-items-center cw-justify-center cw-w-14 cw-h-14 cw-rounded-full cw-shadow-xl cw-transition-all cw-focus-outline-none cw-focus-ring-2';
-      chatButton.style.backgroundColor = this.settings.primary_color || '#4f46e5';
-      chatButton.innerHTML = this.isOpen ? `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.x}</span>` : `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.messageCircle}</span>`;
-      chatButton.setAttribute('aria-label', this.isOpen ? 'Close chat' : 'Open chat');
-      chatButton.onclick = () => this.toggleChat();
-      if (!this.isOpen || this.isMinimized) this.container.appendChild(chatButton);
+      this.chatButton = document.createElement('button');
+      this.chatButton.className = 'cw-flex cw-items-center cw-justify-center cw-w-14 cw-h-14 cw-rounded-full cw-shadow-xl cw-transition-all cw-focus-outline-none cw-focus-ring-2';
+      this.chatButton.style.backgroundColor = this.settings.primary_color || '#4f46e5';
+      this.chatButton.innerHTML = `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.messageCircle}</span>`;
+      this.chatButton.setAttribute('aria-label', 'Open chat');
+      this.chatButton.onclick = () => this.toggleChat();
+      this.container.appendChild(this.chatButton);
 
       // Chat Window
+      this.chatWindow = document.createElement('div');
+      this.chatWindow.className = 'cw-chat-window cw-bg-white cw-rounded-lg cw-shadow-xl cw-w-80 cw-sm-w-96 cw-mt-4 cw-flex cw-flex-col cw-overflow-hidden cw-max-h-80vh';
+
+      // Header
+      this.header = document.createElement('div');
+      this.header.className = 'cw-p-4 cw-flex cw-justify-between cw-items-center';
+      this.header.style.backgroundColor = this.settings.primary_color || '#4f46e5';
+      this.header.style.borderTopLeftRadius = '0.5rem';
+      this.header.style.borderTopRightRadius = '0.5rem';
+
+      const headerLeft = document.createElement('div');
+      headerLeft.className = 'cw-flex cw-items-center';
+
+      const agentAvatar = document.createElement('div');
+      agentAvatar.className = 'cw-w-10 cw-h-10 cw-rounded-full cw-bg-white cw-flex cw-items-center cw-justify-center cw-mr-2';
+      agentAvatar.innerHTML = `<span class="cw-text-lg" style="color: ${this.settings.primary_color || '#4f46e5'}">${icons.user}</span>`;
+
+      const titleDiv = document.createElement('div');
+      titleDiv.innerHTML = `
+        <h3 class="cw-text-white cw-font-semibold">${this.settings.business_name || 'Chat'}</h3>
+        <p class="cw-text-xs cw-text-white">Online | ${this.settings.sales_representative || 'Support'}</p>
+      `;
+
+      headerLeft.append(agentAvatar, titleDiv);
+
+      const headerActions = document.createElement('div');
+      headerActions.className = 'cw-flex cw-items-center cw-space-x-2';
+
+      const closeButton = document.createElement('button');
+      closeButton.className = 'cw-text-white cw-focus-outline-none';
+      closeButton.innerHTML = `<span class="cw-w-5 cw-h-5">${icons.x}</span>`;
+      closeButton.setAttribute('aria-label', 'Close chat');
+      closeButton.onclick = () => this.toggleChat();
+
+      headerActions.append(closeButton);
+      this.header.append(headerLeft, headerActions);
+
+      // Messages Container
+      this.messagesContainer = document.createElement('div');
+      this.messagesContainer.className = 'cw-flex-1 cw-p-4 cw-overflow-y-auto cw-max-h-50vh';
+
+      // Typing Indicator
+      this.typingIndicator = document.createElement('div');
+      this.typingIndicator.className = 'cw-px-4 cw-py-2 cw-hidden';
+      this.typingIndicator.innerHTML = '<div class="cw-typing-indicator"><span></span><span></span><span></span></div>';
+
+      // Input Form
+      this.form = document.createElement('form');
+      this.form.className = 'cw-p-3 cw-border-t cw-border-gray-200';
+      this.form.innerHTML = `
+        <div class="cw-flex cw-items-end">
+          <textarea rows="1" placeholder="Type your message..." class="cw-flex-1 cw-px-3 cw-py-2 cw-border cw-border-gray-200 cw-rounded-lg cw-focus-outline-none cw-focus-ring-2 cw-resize-none" aria-label="Message"></textarea>
+          <button type="submit" class="cw-ml-2 cw-p-2 cw-rounded-full cw-focus-outline-none cw-focus-ring-2" style="background-color: ${this.settings.primary_color || '#4f46e5'}" aria-label="Send message">
+            <span class="cw-w-5 cw-h-5 cw-text-white">${icons.send}</span>
+          </button>
+        </div>
+      `;
+
+      this.textarea = this.form.querySelector('textarea');
+      this.textarea.oninput = () => {
+        this.textarea.style.height = 'auto';
+        this.textarea.style.height = Math.min(this.textarea.scrollHeight, 120) + 'px';
+      };
+      this.textarea.onkeydown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          this.form.dispatchEvent(new Event('submit'));
+        }
+      };
+      this.form.onsubmit = (e) => {
+        e.preventDefault();
+        if (this.textarea.value.trim()) {
+          this.sendMessage(this.textarea.value);
+          this.textarea.value = '';
+          this.textarea.style.height = 'auto';
+        }
+      };
+
+      // Append all elements to chat window
+      this.chatWindow.append(this.header, this.messagesContainer, this.typingIndicator, this.form);
+      this.container.appendChild(this.chatWindow);
+    }
+
+    updateUI() {
+      if (!this.settings) return;
+
+      // Update chat button
+      this.chatButton.style.backgroundColor = this.settings.primary_color || '#4f46e5';
+      this.chatButton.innerHTML = this.isOpen ? 
+        `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.x}</span>` : 
+        `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.messageCircle}</span>`;
+      this.chatButton.setAttribute('aria-label', this.isOpen ? 'Close chat' : 'Open chat');
+
+      // Update chat window visibility
       if (this.isOpen && !this.isMinimized) {
-        const chatWindow = document.createElement('div');
-        chatWindow.className = 'cw-bg-white cw-rounded-lg cw-shadow-xl cw-w-80 cw-sm-w-96 cw-mt-4 cw-flex cw-flex-col cw-overflow-hidden cw-max-h-80vh cw-animate-slide-up';
+        this.chatWindow.classList.add('cw-open');
+        this.updateChatContent();
+      } else {
+        this.chatWindow.classList.remove('cw-open');
+      }
+    }
 
-        // Header
-        const header = document.createElement('div');
-        header.className = 'cw-p-4 cw-flex cw-justify-between cw-items-center';
-        header.style.backgroundColor = this.settings.primary_color || '#4f46e5';
-        header.style.borderTopLeftRadius = '0.5rem';
-        header.style.borderTopRightRadius = '0.5rem';
+    updateChatContent() {
+      // Update messages
+      this.messagesContainer.innerHTML = '';
 
-        const headerLeft = document.createElement('div');
-        headerLeft.className = 'cw-flex cw-items-center';
-
-        const agentAvatar = document.createElement('div');
-        agentAvatar.className = 'cw-w-10 cw-h-10 cw-rounded-full cw-bg-white cw-flex cw-items-center cw-justify-center cw-mr-2';
-        agentAvatar.innerHTML = `<span class="cw-text-lg" style="color: ${this.settings.primary_color || '#4f46e5'}">${icons.user}</span>`;
-
-        const titleDiv = document.createElement('div');
-        titleDiv.innerHTML = `
-          <h3 class="cw-text-white cw-font-semibold">${this.settings.business_name || 'Chat'}</h3>
-          <p class="cw-text-xs cw-text-white">Online | ${this.settings.sales_representative || 'Support'}</p>
-        `;
-
-        headerLeft.append(agentAvatar, titleDiv);
-
-        const headerActions = document.createElement('div');
-        headerActions.className = 'cw-flex cw-items-center cw-space-x-2';
-
-        const closeButton = document.createElement('button');
-        closeButton.className = 'cw-text-white cw-focus-outline-none';
-        closeButton.innerHTML = `<span class="cw-w-5 cw-h-5">${icons.x}</span>`;
-        closeButton.setAttribute('aria-label', 'Close chat');
-        closeButton.onclick = () => this.toggleChat();
-
-        headerActions.append(closeButton);
-        header.append(headerLeft, headerActions);
-        chatWindow.append(header);
-
-        // Messages Container
-        const messagesContainer = document.createElement('div');
-        messagesContainer.className = 'cw-flex-1 cw-p-4 cw-overflow-y-auto cw-max-h-50vh';
-
-        if (!this.messages.length) {
-          messagesContainer.innerHTML = `
-            <div class="cw-flex cw-flex-col cw-items-center cw-justify-center cw-h-full cw-text-gray-500">
-              <div class="cw-w-16 cw-h-16 cw-rounded-full cw-bg-gray-100 cw-flex cw-items-center cw-justify-center cw-mb-2">
-                <span class="cw-w-8 cw-h-8">${icons.messageCircle}</span>
-              </div>
-              <p class="cw-font-medium">Start a conversation</p>
-              <p class="cw-text-sm">Send a message to begin</p>
+      if (!this.messages.length) {
+        this.messagesContainer.innerHTML = `
+          <div class="cw-flex cw-flex-col cw-items-center cw-justify-center cw-h-full cw-text-gray-500">
+            <div class="cw-w-16 cw-h-16 cw-rounded-full cw-bg-gray-100 cw-flex cw-items-center cw-justify-center cw-mb-2">
+              <span class="cw-w-8 cw-h-8">${icons.messageCircle}</span>
             </div>
-          `;
-          this.createChatSession();
-        } else {
-          const wrapper = document.createElement('div');
-          wrapper.className = 'cw-space-y-4';
-
-          let currentSender = null;
-          let messageGroups = [];
-          let currentGroup = [];
-
-          this.messages.forEach((msg, idx) => {
-            if (msg.sender !== currentSender) {
-              if (currentGroup.length) messageGroups.push({ sender: currentSender, messages: [...currentGroup] });
-              currentGroup = [msg];
-              currentSender = msg.sender;
-            } else {
-              currentGroup.push(msg);
-            }
-            if (idx === this.messages.length - 1) messageGroups.push({ sender: currentSender, messages: [...currentGroup] });
-          });
-
-          messageGroups.forEach(group => {
-            const groupEl = document.createElement('div');
-            groupEl.className = `cw-flex ${group.sender === 'user' ? 'cw-justify-end' : 'cw-justify-start'} cw-animate-slide-in`;
-
-            const messagesEl = document.createElement('div');
-            messagesEl.className = 'cw-flex cw-flex-col';
-
-            group.messages.forEach(msg => {
-              const bubble = document.createElement('div');
-              bubble.className = `cw-chat-bubble ${msg.sender === 'user' ? 'cw-chat-bubble-user' : msg.sender === 'agent' ? 'cw-chat-bubble-agent' : 'cw-chat-bubble-bot'}`;
-              bubble.innerHTML = `<div class="cw-whitespace-pre-wrap cw-break-words">${msg.text}</div>`;
-              messagesEl.appendChild(bubble);
-            });
-
-            const timestamp = document.createElement('div');
-            timestamp.className = `cw-text-xs cw-text-gray-500 ${group.sender === 'user' ? 'cw-text-right' : 'cw-text-left'}`;
-            timestamp.textContent = formatTime(group.messages[group.messages.length - 1].timestamp);
-            messagesEl.appendChild(timestamp);
-
-            groupEl.appendChild(messagesEl);
-            wrapper.appendChild(groupEl);
-          });
-
-          messagesContainer.appendChild(wrapper);
-        }
-        chatWindow.appendChild(messagesContainer);
-
-        // Typing Indicator
-        if (this.isTyping) {
-          const typing = document.createElement('div');
-          typing.className = 'cw-px-4 cw-py-2';
-          typing.innerHTML = '<div class="cw-typing-indicator"><span></span><span></span><span></span></div>';
-          chatWindow.appendChild(typing);
-        }
-
-        // Input Form
-        const form = document.createElement('form');
-        form.className = 'cw-p-3 cw-border-t cw-border-gray-200';
-        form.innerHTML = `
-          <div class="cw-flex cw-items-end">
-            <textarea rows="1" placeholder="Type your message..." class="cw-flex-1 cw-px-3 cw-py-2 cw-border cw-border-gray-200 cw-rounded-lg cw-focus-outline-none cw-focus-ring-2 cw-resize-none" aria-label="Message"></textarea>
-            <button type="submit" class="cw-ml-2 cw-p-2 cw-rounded-full cw-focus-outline-none cw-focus-ring-2" style="background-color: ${this.settings.primary_color || '#4f46e5'}" aria-label="Send message">
-              <span class="cw-w-5 cw-h-5 cw-text-white">${icons.send}</span>
-            </button>
+            <p class="cw-font-medium">Start a conversation</p>
+            <p class="cw-text-sm">Send a message to begin</p>
           </div>
         `;
+      } else {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'cw-space-y-4';
 
-        const textarea = form.querySelector('textarea');
-        textarea.oninput = () => {
-          textarea.style.height = 'auto';
-          textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-        };
-        textarea.onkeydown = (e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            form.dispatchEvent(new Event('submit'));
+        let currentSender = null;
+        let messageGroups = [];
+        let currentGroup = [];
+
+        this.messages.forEach((msg, idx) => {
+          if (msg.sender !== currentSender) {
+            if (currentGroup.length) messageGroups.push({ sender: currentSender, messages: [...currentGroup] });
+            currentGroup = [msg];
+            currentSender = msg.sender;
+          } else {
+            currentGroup.push(msg);
           }
-        };
-        form.onsubmit = (e) => {
-          e.preventDefault();
-          if (textarea.value.trim()) {
-            this.sendMessage(textarea.value);
-            textarea.value = '';
-            textarea.style.height = 'auto';
-          }
-        };
+          if (idx === this.messages.length - 1) messageGroups.push({ sender: currentSender, messages: [...currentGroup] });
+        });
 
-        chatWindow.appendChild(form);
-        this.container.appendChild(chatWindow);
+        messageGroups.forEach(group => {
+          const groupEl = document.createElement('div');
+          groupEl.className = `cw-flex ${group.sender === 'user' ? 'cw-justify-end' : 'cw-justify-start'}`;
 
-        // Focus textarea and scroll to bottom
-        setTimeout(() => textarea.focus(), 100);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          const messagesEl = document.createElement('div');
+          messagesEl.className = 'cw-flex cw-flex-col';
+
+          group.messages.forEach(msg => {
+            const bubble = document.createElement('div');
+            bubble.className = `cw-chat-bubble ${msg.sender === 'user' ? 'cw-chat-bubble-user' : msg.sender === 'agent' ? 'cw-chat-bubble-agent' : 'cw-chat-bubble-bot'}`;
+            bubble.innerHTML = `<div class="cw-whitespace-pre-wrap cw-break-words">${msg.text}</div>`;
+            messagesEl.appendChild(bubble);
+          });
+
+          const timestamp = document.createElement('div');
+          timestamp.className = `cw-text-xs cw-text-gray-500 ${group.sender === 'user' ? 'cw-text-right' : 'cw-text-left'}`;
+          timestamp.textContent = formatTime(group.messages[group.messages.length - 1].timestamp);
+          messagesEl.appendChild(timestamp);
+
+          groupEl.appendChild(messagesEl);
+          wrapper.appendChild(groupEl);
+        });
+
+        this.messagesContainer.appendChild(wrapper);
       }
+
+      // Update typing indicator
+      this.typingIndicator.className = this.isTyping ? 'cw-px-4 cw-py-2' : 'cw-px-4 cw-py-2 cw-hidden';
+
+      // Scroll to bottom
+      this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+
+      // Focus textarea
+      setTimeout(() => this.textarea?.focus(), 100);
     }
 
     toggleChat() {
       this.isOpen = !this.isOpen;
       this.isMinimized = false;
-      this.render();
+      this.updateUI();
+      
       if (this.isOpen) {
+        this.createChatSession();
         this.startMessagePolling();
         document.addEventListener('keydown', this.handleEscapeKey);
       } else {
@@ -446,9 +483,11 @@
           text: msg.message,
           timestamp: new Date(msg.created_at)
         }));
-        if (formatted.length !== this.messages.length) {
+        
+        // Only update UI if messages have changed
+        if (JSON.stringify(formatted) !== JSON.stringify(this.messages)) {
           this.messages = formatted;
-          this.render();
+          this.updateChatContent();
         }
       } catch (error) {
         console.error('Error fetching messages:', error);
@@ -492,7 +531,7 @@
 
       const userMessage = { id: generateId(), sender: 'user', text, timestamp: new Date() };
       this.messages.push(userMessage);
-      this.render();
+      this.updateChatContent();
 
       try {
         await Promise.all([
@@ -562,7 +601,7 @@
 
       const botMessage = { id: generateId(), sender: 'bot', text, timestamp: new Date() };
       this.messages.push(botMessage);
-      this.render();
+      this.updateChatContent();
 
       try {
         await fetch(`${this.supabase.url}/rest/v1/chat_messages`, {
@@ -586,12 +625,12 @@
 
     showTypingIndicator() {
       this.isTyping = true;
-      this.render();
+      this.updateUI();
     }
 
     hideTypingIndicator() {
       this.isTyping = false;
-      this.render();
+      this.updateUI();
     }
   }
 
