@@ -60,6 +60,7 @@
       .cw-resize-none { resize: none; }
       .cw-whitespace-pre-wrap { white-space: pre-wrap; }
       .cw-break-words { overflow-wrap: break-word; }
+      .cw-break-all { word-break: break-all; }
       .cw-hidden { display: none; }
 
       /* Chat window transition */
@@ -91,6 +92,8 @@
         margin-bottom: 0.25rem;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         line-height: 1.5;
+        word-break: break-word;
+        overflow-wrap: break-word;
       }
       .cw-chat-bubble-user {
         background-color: #2563eb;
@@ -240,7 +243,7 @@
         outline: none;
         cursor: pointer;
         transition: all 0.2s ease;
-        background: transparent;
+        background-color: #4f46e5;
       }
       .cw-send-button:hover {
         transform: translateY(-50%) scale(1.05);
@@ -253,6 +256,22 @@
       .cw-messages-container {
         height: 380px; /* Fixed height for messages container */
         overflow-y: auto;
+      }
+      
+      /* Timestamp styles */
+      .cw-timestamp {
+        font-size: 0.7rem;
+        color: #6b7280;
+        margin-top: 0.25rem;
+        display: inline-block;
+      }
+      .cw-timestamp-user {
+        text-align: right;
+        margin-right: 0.5rem;
+      }
+      .cw-timestamp-bot {
+        text-align: left;
+        margin-left: 0.5rem;
       }
 
       /* Responsive adjustments */
@@ -412,7 +431,7 @@
         <div class="cw-input-container">
           <input type="text" placeholder="Type your message..." class="cw-input" aria-label="Message">
           <button type="submit" class="cw-send-button" aria-label="Send message">
-            <span class="cw-w-5 cw-h-5" style="color: ${this.settings.primary_color || '#4f46e5'}">${icons.send}</span>
+            <span class="cw-w-5 cw-h-5 cw-text-white">${icons.send}</span>
           </button>
         </div>
       `;
@@ -452,6 +471,12 @@
       } else {
         this.chatWindow.classList.remove('cw-open');
       }
+      
+      // Update send button color
+      const sendButtons = document.querySelectorAll('.cw-send-button');
+      sendButtons.forEach(button => {
+        button.style.backgroundColor = this.settings.primary_color || '#4f46e5';
+      });
     }
 
     updateChatContent() {
@@ -496,13 +521,13 @@
 
           group.messages.forEach(msg => {
             const bubble = document.createElement('div');
-            bubble.className = `cw-chat-bubble ${msg.sender === 'user' ? 'cw-chat-bubble-user' : msg.sender === 'agent' ? 'cw-chat-bubble-agent' : 'cw-chat-bubble-bot'}`;
-            bubble.innerHTML = `<div class="cw-whitespace-pre-wrap cw-break-words">${msg.text}</div>`;
+            bubble.className = `cw-chat-bubble ${msg.sender === 'user' ? 'cw-chat-bubble-user' : msg.sender === 'agent' ? 'cw-chat-bubble-agent' : 'cw-chat-bubble-bot'} cw-break-words cw-whitespace-pre-wrap`;
+            bubble.innerHTML = `<div class="cw-break-words cw-whitespace-pre-wrap">${msg.text}</div>`;
             messagesEl.appendChild(bubble);
           });
 
           const timestamp = document.createElement('div');
-          timestamp.className = `cw-text-xs cw-text-gray-500 ${group.sender === 'user' ? 'cw-text-right' : 'cw-text-left'}`;
+          timestamp.className = `cw-timestamp ${group.sender === 'user' ? 'cw-timestamp-user' : 'cw-timestamp-bot'}`;
           timestamp.textContent = formatTime(group.messages[group.messages.length - 1].timestamp);
           messagesEl.appendChild(timestamp);
 
