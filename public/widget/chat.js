@@ -117,6 +117,7 @@
         .cw-mt-4 { margin-top: 1rem; }
         .cw-mb-2 { margin-bottom: 0.5rem; }
         .cw-mr-2 { margin-right: 0.5rem; }
+        .cw-mr-3 { margin-right: 0.75rem; }
         .cw-ml-2 { margin-left: 0.5rem; }
         .cw-space-y-4 > * + * { margin-top: 1rem; }
         .cw-shadow-lg { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
@@ -204,6 +205,7 @@
         .cw-header {
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
           height: 70px; /* Increased height for header */
+          padding: 12px;
         }
         
         /* Header title styles */
@@ -213,7 +215,7 @@
         }
         .cw-header-title h3 {
           font-weight: 600;
-          font-size: 1.05rem;
+          font-size: 1rem;
           line-height: 1.3;
           margin: 0;
         }
@@ -426,27 +428,31 @@
       this.chatWindow = document.createElement('div');
       this.chatWindow.className = 'cw-chat-window cw-fixed cw-bottom-4 cw-right-4 cw-bg-white cw-rounded-lg cw-shadow-lg cw-flex cw-flex-col cw-overflow-hidden cw-z-50';
 
-      // Header
+      // Header - Updated to match the new design
       const header = document.createElement('div');
-      header.className = 'cw-header cw-p-3 cw-flex cw-justify-between cw-items-center';
+      header.className = 'cw-header cw-flex cw-justify-between cw-items-center';
       header.style.backgroundColor = this.settings.primary_color || '#4f46e5';
 
+      // Left side with avatar and text
       const headerLeft = document.createElement('div');
       headerLeft.className = 'cw-flex cw-items-center';
 
+      // Avatar container
       const agentAvatar = document.createElement('div');
       agentAvatar.className = 'cw-w-10 cw-h-10 cw-rounded-full cw-bg-white cw-flex cw-items-center cw-justify-center cw-mr-3';
-      agentAvatar.innerHTML = `<span class="cw-text-lg" style="color: ${this.settings.primary_color || '#4f46e5'}">${ICONS.user}</span>`;
+      agentAvatar.innerHTML = `<span style="color: ${this.settings.primary_color || '#4f46e5'}">${ICONS.user}</span>`;
 
+      // Text container
       const titleDiv = document.createElement('div');
       titleDiv.className = 'cw-header-title';
       titleDiv.innerHTML = `
         <h3 class="cw-text-white">${this.settings.business_name || 'Chat'}</h3>
-        <p class="cw-text-white">Online | ${this.settings.sales_representative || 'Support'}</p>
+        <p class="cw-text-white">${this.settings.sales_representative || 'Support'}</p>
       `;
 
       headerLeft.append(agentAvatar, titleDiv);
 
+      // Close icon
       const closeIcon = document.createElement('div');
       closeIcon.className = 'cw-close-icon cw-text-white';
       closeIcon.innerHTML = `<span class="cw-w-5 cw-h-5">${ICONS.close}</span>`;
