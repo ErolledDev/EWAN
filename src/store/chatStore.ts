@@ -20,6 +20,7 @@ interface ChatState {
   toggleAgentMode: () => void;
   closeSession: (sessionId: string) => Promise<void>;
   updateSessionMetadata: (sessionId: string, metadata: Record<string, any>) => Promise<void>;
+  markSessionAsRead: (sessionId: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -41,19 +42,48 @@ export const useChatStore = create<ChatState>()(
           
           if (error) throw error;
           
-          set({ activeSessions: data as ChatSession[] });
+          // Check for new messages since last fetch
+          const currentSessions = get().activeSessions;
+          const newSessions = data as ChatSession[];
+          
+          // Mark sessions as unread if they have been updated since last fetch
+          const updatedSessions = newSessions.map(newSession => {
+            const existingSession = currentSessions.find(s => s.id === newSession.id);
+            
+            // If session exists and has been updated
+            if (existingSession) {
+              const newUpdateTime = new Date(newSession.updated_at).getTime();
+              const oldUpdateTime = new Date(existingSession.updated_at).getTime();
+              
+              // If the session has been updated and it's not the current session
+              if (newUpdateTime > oldUpdateTime && 
+                  (!get().currentSession || get().currentSession.id !== newSession.id)) {
+                return {
+                  ...newSession,
+                  metadata: {
+                    ...newSession.metadata,
+                    unread: true
+                  }
+                };
+              }
+            }
+            
+            return newSession;
+          });
+          
+          set({ activeSessions: updatedSessions });
           
           // If we have a current session, make sure it's still in the active sessions
           const currentSession = get().currentSession;
           if (currentSession) {
-            const stillActive = data.some(session => session.id === currentSession.id);
+            const stillActive = updatedSessions.some(session => session.id === currentSession.id);
             if (!stillActive) {
               set({ currentSession: null });
             } else {
               // Update the current session with the latest data
-              const updatedSession = data.find(session => session.id === currentSession.id);
+              const updatedSession = updatedSessions.find(session => session.id === currentSession.id);
               if (updatedSession) {
-                set({ currentSession: updatedSession as ChatSession });
+                set({ currentSession: updatedSession });
               }
             }
           }
@@ -239,6 +269,49 @@ export const useChatStore = create<ChatState>()(
           return;
         } catch (error) {
           console.error('Error updating session metadata:', error);
+          throw error;
+        }
+      },
+      
+      markSessionAsRead: async (sessionId: string) => {
+        try {
+          const session = get().activeSessions.find(s => s.id === sessionId);
+          if (!session || !session.metadata?.unread) return;
+          
+          const { unread, ...restMetadata } = session.metadata;
+          
+          // Update the session metadata
+          const { error } = await supabase
+            .from('chat_sessions')
+            .update({
+              metadata: restMetadata,
+            })
+            .eq('id', sessionId);
+          
+          if (error) throw error;
+          
+          // Update the session in the local state
+          set({
+            activeSessions: get().activeSessions.map(session => 
+              session.id === sessionId 
+                ? { ...session, metadata: restMetadata } 
+                : session
+            )
+          });
+          
+          // If this is the current session, update it too
+          if (get().currentSession?.id === sessionId) {
+            set({ 
+              currentSession: { 
+                ...get().currentSession!, 
+                metadata: restMetadata
+              } 
+            });
+          }
+          
+          return;
+        } catch (error) {
+          console.error('Error marking session as read:', error);
           throw error;
         }
       }

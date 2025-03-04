@@ -61,6 +61,7 @@ export interface ChatSession {
     visitorName?: string;
     pinned?: boolean;
     note?: string;
+    unread?: boolean;
     label?: {
       text: string;
       color: string;

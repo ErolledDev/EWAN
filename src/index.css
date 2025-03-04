@@ -112,3 +112,26 @@
     transform: translateX(0);
   }
 }
+
+/* Sticky section headers */
+.sticky {
+  position: sticky;
+  z-index: 10;
+}
+
+/* Unread message styling */
+.unread-indicator {
+  position: relative;
+}
+
+.unread-indicator::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+  top: 0;
+  right: 0;
+  transform: translate(50%, -50%);
+}

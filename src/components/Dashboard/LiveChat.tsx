@@ -27,7 +27,8 @@ import {
   ArrowLeft,
   Menu,
   MoreVertical,
-  AlertTriangle
+  AlertTriangle,
+  Bell
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
@@ -44,7 +45,8 @@ const LiveChat: React.FC = () => {
     sendMessage,
     toggleAgentMode,
     closeSession,
-    updateSessionMetadata
+    updateSessionMetadata,
+    markSessionAsRead
   } = useChatStore();
   const { addNotification } = useNotificationStore();
   
@@ -162,9 +164,14 @@ const LiveChat: React.FC = () => {
         setMobileView('chat');
       }
       
+      // Mark session as read when selected
+      if (currentSession.metadata?.unread) {
+        markSessionAsRead(currentSession.id);
+      }
+      
       return () => clearInterval(interval);
     }
-  }, [currentSession, fetchMessages, isMobile]);
+  }, [currentSession, fetchMessages, isMobile, markSessionAsRead]);
   
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -456,21 +463,30 @@ const LiveChat: React.FC = () => {
         return !!session.metadata?.label;
       case 'noted':
         return !!session.metadata?.note;
+      case 'unread':
+        return !!session.metadata?.unread;
       case 'all':
       default:
         return true;
     }
   });
   
-  // Sort sessions: pinned first, then by updated_at
-  const sortedSessions = [...filteredSessions].sort((a, b) => {
-    // First sort by pinned status
-    if (a.metadata?.pinned && !b.metadata?.pinned) return -1;
-    if (!a.metadata?.pinned && b.metadata?.pinned) return 1;
-    
-    // Then sort by updated_at (most recent first)
+  // Separate pinned and unpinned sessions
+  const pinnedSessions = filteredSessions.filter(session => session.metadata?.pinned);
+  const unpinnedSessions = filteredSessions.filter(session => !session.metadata?.pinned);
+  
+  // Sort unpinned sessions by updated_at (most recent first)
+  const sortedUnpinnedSessions = [...unpinnedSessions].sort((a, b) => {
     return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
   });
+  
+  // Sort pinned sessions by updated_at (most recent first)
+  const sortedPinnedSessions = [...pinnedSessions].sort((a, b) => {
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+  });
+  
+  // Combine sorted pinned and unpinned sessions
+  const sortedSessions = [...sortedPinnedSessions, ...sortedUnpinnedSessions];
   
   // Get current session messages
   const currentMessages = currentSession ? (messages[currentSession.id] || []) : [];
@@ -507,11 +523,16 @@ const LiveChat: React.FC = () => {
         return 'Labeled';
       case 'noted':
         return 'With notes';
+      case 'unread':
+        return 'Unread';
       case 'all':
       default:
         return 'All';
     }
   };
+  
+  // Count unread conversations
+  const unreadCount = activeSessions.filter(session => session.metadata?.unread).length;
   
   // Render the label management modal
   const renderLabelManagementModal = () => {
@@ -618,7 +639,15 @@ const LiveChat: React.FC = () => {
         >
           <div className="p-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-gray-800">Conversations</h2>
+              <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+                Conversations
+                {unreadCount > 0 && (
+                  <span className="ml-2 bg-indigo-600 text-white text-xs font-medium px-2 py-0.5 rounded-full flex items-center">
+                    <Bell className="h-3 w-3 mr-1" />
+                    {unreadCount}
+                  </span>
+                )}
+              </h2>
               <button
                 onClick={handleRefreshSessions}
                 disabled={isRefreshing}
@@ -687,6 +716,15 @@ const LiveChat: React.FC = () => {
                       </button>
                       <button
                         onClick={() => {
+                          setFilterOption('unread');
+                          setShowFilterMenu(false);
+                        }}
+                        className={`block px-4 py-2 text-left w-full hover:bg-gray-100 ${filterOption === 'unread' ? 'bg-indigo-50 text-indigo-700' : ''}`}
+                      >
+                        Unread only
+                      </button>
+                      <button
+                        onClick={() => {
                           setFilterOption('pinned');
                           setShowFilterMenu(false);
                         }}
@@ -731,65 +769,153 @@ const LiveChat: React.FC = () => {
                 <p className="text-xs mt-1">Waiting for visitors to start chatting</p>
               </div>
             ) : (
-              <ul className="divide-y divide-gray-100">
-                {sortedSessions.map((session) => {
-                  const visitorName = session.metadata?.visitorName;
-                  const isPinned = session.metadata?.pinned;
-                  const label = session.metadata?.label;
-                  const hasNote = !!session.metadata?.note;
-                  
-                  return (
-                    <li 
-                      key={session.id}
-                      className={`hover:bg-gray-50 cursor-pointer transition-colors ${
-                        currentSession?.id === session.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''
-                      }`}
-                      onClick={() => handleSelectSession(session.id)}
-                    >
-                      <div className="p-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3">
-                            <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white font-medium ${
-                              currentSession?.id === session.id ? 'bg-indigo-500' : 'bg-gray-400'
-                            }`}>
-                              {visitorName ? getInitials(visitorName) : '?'}
-                            </div>
-                            <div>
-                              <div className="flex items-center">
-                                <h3 className="text-sm font-medium text-gray-900 truncate max-w-[120px]">
-                                  {visitorName || `Visitor ${session.visitor_id.substring(0, 8)}`}
-                                </h3>
-                                {isPinned && (
-                                  <Pin className="h-3 w-3 text-indigo-500 ml-1" />
-                                )}
-                                {hasNote && (
-                                  <Edit className="h-3 w-3 text-amber-500 ml-1" />
-                                )}
+              <div>
+                {/* Pinned conversations section */}
+                {sortedPinnedSessions.length > 0 && (
+                  <div className="sticky top-0 z-10 bg-indigo-50 px-3 py-2 border-b border-indigo-100">
+                    <div className="flex items-center text-xs font-medium text-indigo-700">
+                      <Pin className="h-3 w-3 mr-1" />
+                      Pinned Conversations
+                    </div>
+                  </div>
+                )}
+                
+                {/* Pinned conversations list */}
+                {sortedPinnedSessions.length > 0 && (
+                  <ul className="divide-y divide-gray-100">
+                    {sortedPinnedSessions.map((session) => {
+                      const visitorName = session.metadata?.visitorName;
+                      const isPinned = session.metadata?.pinned;
+                      const label = session.metadata?.label;
+                      const hasNote = !!session.metadata?.note;
+                      const isUnread = !!session.metadata?.unread;
+                      
+                      return (
+                        <li 
+                          key={session.id}
+                          className={`hover:bg-gray-50 cursor-pointer transition-colors ${
+                            currentSession?.id === session.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''
+                          } ${isUnread ? 'bg-blue-50' : ''}`}
+                          onClick={() => handleSelectSession(session.id)}
+                        >
+                          <div className="p-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-3">
+                                <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white font-medium ${
+                                  currentSession?.id === session.id ? 'bg-indigo-500' : isUnread ? 'bg-blue-500' : 'bg-gray-400'
+                                }`}>
+                                  {visitorName ? getInitials(visitorName) : '?'}
+                                </div>
+                                <div>
+                                  <div className="flex items-center">
+                                    <h3 className={`text-sm font-medium truncate max-w-[120px] ${isUnread ? 'text-blue-800 font-bold' : 'text-gray-900'}`}>
+                                      {visitorName || `Visitor ${session.visitor_id.substring(0, 8)}`}
+                                    </h3>
+                                    <Pin className="h-3 w-3 text-indigo-500 ml-1" />
+                                    {hasNote && (
+                                      <Edit className="h-3 w-3 text-amber-500 ml-1" />
+                                    )}
+                                    {isUnread && (
+                                      <span className="ml-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500 flex items-center mt-1">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {formatTimestamp(session.updated_at)}
+                                  </p>
+                                </div>
                               </div>
-                              <p className="text-xs text-gray-500 flex items-center mt-1">
-                                <Clock className="h-3 w-3 mr-1" />
-                                {formatTimestamp(session.updated_at)}
-                              </p>
+                              
+                              {label && (
+                                <span 
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                  style={{ 
+                                    backgroundColor: `${label.color}20`, 
+                                    color: label.color 
+                                  }}
+                                >
+                                  {label.text}
+                                </span>
+                              )}
                             </div>
                           </div>
-                          
-                          {label && (
-                            <span 
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                              style={{ 
-                                backgroundColor: `${label.color}20`, 
-                                color: label.color 
-                              }}
-                            >
-                              {label.text}
-                            </span>
-                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                
+                {/* Unpinned conversations section */}
+                {sortedUnpinnedSessions.length > 0 && (
+                  <div className={`sticky ${sortedPinnedSessions.length > 0 ? 'top-8' : 'top-0'} z-10 bg-gray-100 px-3 py-2 border-b border-gray-200`}>
+                    <div className="flex items-center text-xs font-medium text-gray-700">
+                      <MessageCircle className="h-3 w-3 mr-1" />
+                      {sortedPinnedSessions.length > 0 ? 'Other Conversations' : 'All Conversations'}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Unpinned conversations list */}
+                <ul className="divide-y divide-gray-100">
+                  {sortedUnpinnedSessions.map((session) => {
+                    const visitorName = session.metadata?.visitorName;
+                    const label = session.metadata?.label;
+                    const hasNote = !!session.metadata?.note;
+                    const isUnread = !!session.metadata?.unread;
+                    
+                    return (
+                      <li 
+                        key={session.id}
+                        className={`hover:bg-gray-50 cursor-pointer transition-colors ${
+                          currentSession?.id === session.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''
+                        } ${isUnread ? 'bg-blue-50' : ''}`}
+                        onClick={() => handleSelectSession(session.id)}
+                      >
+                        <div className="p-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-3">
+                              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white font-medium ${
+                                currentSession?.id === session.id ? 'bg-indigo-500' : isUnread ? 'bg-blue-500' : 'bg-gray-400'
+                              }`}>
+                                {visitorName ? getInitials(visitorName) : '?'}
+                              </div>
+                              <div>
+                                <div className="flex items-center">
+                                  <h3 className={`text-sm font-medium truncate max-w-[120px] ${isUnread ? 'text-blue-800 font-bold' : 'text-gray-900'}`}>
+                                    {visitorName || `Visitor ${session.visitor_id.substring(0, 8)}`}
+                                  </h3>
+                                  {hasNote && (
+                                    <Edit className="h-3 w-3 text-amber-500 ml-1" />
+                                  )}
+                                  {isUnread && (
+                                    <span className="ml-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 flex items-center mt-1">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  {formatTimestamp(session.updated_at)}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {label && (
+                              <span 
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                style={{ 
+                                  backgroundColor: `${label.color}20`, 
+                                  color: label.color 
+                                }}
+                              >
+                                {label.text}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             )}
           </div>
         </div>
