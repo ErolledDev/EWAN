@@ -391,6 +391,7 @@
       this.isInitialized = false; // Track if widget is fully initialized
       this.retryCount = 0; // Track retry attempts for session creation
       this.maxRetries = 3; // Maximum number of retries
+      this.isProcessingMessage = false; // Flag to prevent multiple submissions
       
       // DOM elements
       this.container = null;
@@ -548,12 +549,12 @@
       this.messagesContainer.className = 'cw-messages-container cw-flex-1 cw-p-4 cw-overflow-y-auto';
 
       // Input Form
-      this.form = document.createElement('form');
+      this.form = document.createElement('div');
       this.form.className = 'cw-input-area';
       this.form.innerHTML = `
         <div class="cw-input-container">
           <input type="text" placeholder="Type your message..." class="cw-input" aria-label="Message">
-          <button type="submit" class="cw-send-button" aria-label="Send message">
+          <button type="button" class="cw-send-button" aria-label="Send message">
             <span class="cw-w-5 cw-h-5 cw-text-white">${icons.send}</span>
           </button>
         </div>
@@ -563,20 +564,23 @@
       this.input.onkeydown = (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          this.form.dispatchEvent(new Event('submit'));
+          this.handleSendButtonClick();
         }
       };
-      this.form.onsubmit = (e) => {
-        e.preventDefault();
-        if (this.input.value.trim()) {
-          this.sendMessage(this.input.value);
-          this.input.value = '';
-        }
-      };
+      
+      const sendButton = this.form.querySelector('.cw-send-button');
+      sendButton.onclick = () => this.handleSendButtonClick();
 
       // Append all elements to chat window
       this.chatWindow.append(this.header, this.messagesContainer, this.form);
       this.container.appendChild(this.chatWindow);
+    }
+    
+    handleSendButtonClick() {
+      if (this.input.value.trim() && !this.isProcessingMessage) {
+        this.sendMessage(this.input.value);
+        this.input.value = '';
+      }
     }
 
     updateUI() {
@@ -856,12 +860,26 @@
     }
 
     async sendMessage(text) {
+      // Prevent multiple submissions
+      if (this.isProcessingMessage) {
+        return;
+      }
+      
+      this.isProcessingMessage = true;
+      
       if (!this.sessionId) {
-        await this.createChatSession();
-        
-        // If still no session after creation attempt, show error
-        if (!this.sessionId) {
-          console.error('Unable to create chat session');
+        try {
+          await this.createChatSession();
+          
+          // If still no session after creation attempt, show error
+          if (!this.sessionId) {
+            console.error('Unable to create chat session');
+            this.isProcessingMessage = false;
+            return;
+          }
+        } catch (error) {
+          console.error('Error creating session before sending message:', error);
+          this.isProcessingMessage = false;
           return;
         }
       }
@@ -875,7 +893,7 @@
 
       try {
         // First update the session's updated_at timestamp
-        await fetch(`${this.supabase.url}/rest/v1/chat_sessions?id=eq.${this.sessionId}`, {
+        const sessionUpdateResp = await fetch(`${this.supabase.url}/rest/v1/chat_sessions?id=eq.${this.sessionId}`, {
           method: 'PATCH',
           headers: {
             'apikey': this.supabase.key,
@@ -885,8 +903,12 @@
           body: JSON.stringify({ updated_at: new Date().toISOString() })
         });
         
+        if (!sessionUpdateResp.ok) {
+          throw new Error('Failed to update session timestamp');
+        }
+        
         // Then save the message
-        await fetch(`${this.supabase.url}/rest/v1/chat_messages`, {
+        const messageResp = await fetch(`${this.supabase.url}/rest/v1/chat_messages`, {
           method: 'POST',
           headers: {
             'apikey': this.supabase.key,
@@ -900,8 +922,13 @@
             created_at: new Date().toISOString()
           })
         });
+        
+        if (!messageResp.ok) {
+          throw new Error('Failed to save user message');
+        }
       } catch (error) {
         console.error('Error saving user message:', error);
+        // Continue with local processing even if saving fails
       }
 
       const replyText = this.findReply(text.toLowerCase());
@@ -914,18 +941,25 @@
         // Add a small delay to make it feel more natural
         setTimeout(() => {
           this.isTyping = false;
-          this.sendBotReply(replyText);
+          this.sendBotReply(replyText)
+            .finally(() => {
+              this.isProcessingMessage = false;
+            });
         }, 1500);
       } else if (this.settings.fallback_message) {
         setTimeout(() => {
           this.isTyping = false;
-          this.sendBotReply(this.settings.fallback_message);
+          this.sendBotReply(this.settings.fallback_message)
+            .finally(() => {
+              this.isProcessingMessage = false;
+            });
         }, 1500);
       } else {
         // Hide typing indicator after a delay if no response
         setTimeout(() => {
           this.isTyping = false;
           this.updateChatContent();
+          this.isProcessingMessage = false;
         }, 1500);
       }
     }
@@ -980,7 +1014,7 @@
       this.updateChatContent();
 
       try {
-        await fetch(`${this.supabase.url}/rest/v1/chat_messages`, {
+        const resp = await fetch(`${this.supabase.url}/rest/v1/chat_messages`, {
           method: 'POST',
           headers: {
             'apikey': this.supabase.key,
@@ -994,6 +1028,10 @@
             created_at: new Date().toISOString()
           })
         });
+        
+        if (!resp.ok) {
+          throw new Error('Failed to save bot message');
+        }
       } catch (error) {
         console.error('Error saving bot message:', error);
       }
