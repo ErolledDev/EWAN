@@ -36,6 +36,7 @@
       this.visitorId = localStorage.getItem('chat_visitor_id') || generateId();
       this.isTyping = false;
       this.initialized = false;
+      this.messageSubscription = null;
       
       // Store visitor ID
       localStorage.setItem('chat_visitor_id', this.visitorId);
@@ -514,6 +515,10 @@
           if (sessions && sessions.length > 0) {
             this.sessionId = sessions[0].id;
             await this.fetchMessages();
+            
+            // Set up real-time subscription for messages
+            this.subscribeToMessages();
+            
             return true;
           }
         }
@@ -555,9 +560,78 @@
       }
     }
 
+    subscribeToMessages() {
+      if (!this.sessionId) return;
+      
+      // Create EventSource for SSE (Server-Sent Events)
+      const evtSource = new EventSource(
+        `${this.supabaseUrl}/rest/v1/chat_messages?chat_session_id=eq.${this.sessionId}&order=created_at.desc&limit=1`,
+        {
+          headers: {
+            'apikey': this.supabaseKey,
+            'Authorization': `Bearer ${this.supabaseKey}`
+          }
+        }
+      );
+      
+      // Set up polling for new messages as a fallback
+      this.messagePollingInterval = setInterval(() => {
+        this.checkForNewMessages();
+      }, 3000);
+    }
+    
+    async checkForNewMessages() {
+      if (!this.sessionId) return;
+      
+      try {
+        // Get the latest message timestamp
+        const latestTimestamp = this.messages.length > 0 
+          ? Math.max(...this.messages.map(m => new Date(m.timestamp).getTime()))
+          : 0;
+        
+        // Fetch only newer messages
+        const response = await fetch(
+          `${this.supabaseUrl}/rest/v1/chat_messages?chat_session_id=eq.${this.sessionId}&created_at=gt.${new Date(latestTimestamp).toISOString()}&order=created_at.asc`, 
+          {
+            headers: {
+              'apikey': this.supabaseKey,
+              'Authorization': `Bearer ${this.supabaseKey}`
+            }
+          }
+        );
+        
+        if (response.ok) {
+          const newMessages = await response.json();
+          
+          if (newMessages && newMessages.length > 0) {
+            // Filter out messages we already have (by ID)
+            const existingIds = new Set(this.messages.map(m => m.id));
+            const uniqueNewMessages = newMessages.filter(msg => !existingIds.has(msg.id));
+            
+            if (uniqueNewMessages.length > 0) {
+              // Add new messages
+              const formattedNewMessages = uniqueNewMessages.map(msg => ({
+                id: msg.id,
+                sender: msg.sender_type,
+                text: msg.message,
+                timestamp: new Date(msg.created_at)
+              }));
+              
+              this.messages = [...this.messages, ...formattedNewMessages];
+              this.updateChatContent();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for new messages:', error);
+      }
+    }
+
     async createChatSession() {
       if (this.sessionId) {
         await this.fetchMessages();
+        // Set up real-time subscription for messages
+        this.subscribeToMessages();
         return;
       }
       
@@ -585,6 +659,9 @@
           if (data && data[0] && data[0].id) {
             this.sessionId = data[0].id;
             
+            // Set up real-time subscription for messages
+            this.subscribeToMessages();
+            
             // Send welcome message if configured
             if (this.settings.welcome_message) {
               await this.sendBotReply(this.settings.welcome_message);
@@ -608,6 +685,12 @@
         this.chatWindow.classList.remove('cw-open');
         this.chatButton.style.display = 'flex';
         document.removeEventListener('keydown', this.handleEscapeKey);
+        
+        // Clean up message subscription when chat is closed
+        if (this.messagePollingInterval) {
+          clearInterval(this.messagePollingInterval);
+          this.messagePollingInterval = null;
+        }
       }
     }
 
