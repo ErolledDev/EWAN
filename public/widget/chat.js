@@ -72,6 +72,7 @@
         border-radius: 1.25rem;
         overflow: hidden;
         box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+        height: 500px; /* Fixed height for chat window */
       }
       .cw-chat-window.cw-open {
         visibility: visible;
@@ -79,29 +80,6 @@
         transform: translateY(0) scale(1);
         transition: visibility 0s, opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         pointer-events: auto;
-      }
-
-      /* Typing indicator */
-      .cw-typing-indicator {
-        display: flex;
-        align-items: center;
-        padding-left: 0.75rem;
-      }
-      .cw-typing-indicator span {
-        height: 8px;
-        width: 8px;
-        margin: 0 1px;
-        background-color: #9ca3af;
-        border-radius: 50%;
-        display: inline-block;
-        animation: cw-typing 1s infinite;
-      }
-      .cw-typing-indicator span:nth-child(1) { animation-delay: 0.1s; }
-      .cw-typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-      .cw-typing-indicator span:nth-child(3) { animation-delay: 0.3s; }
-      @keyframes cw-typing {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-5px); }
       }
 
       /* Modern chat bubble styles with pointers */
@@ -187,6 +165,35 @@
       /* Header styles */
       .cw-header {
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        height: 60px; /* Fixed height for header */
+      }
+      
+      /* Header title styles - compact */
+      .cw-header-title {
+        display: flex;
+        flex-direction: column;
+      }
+      .cw-header-title h3 {
+        font-weight: 600;
+        font-size: 0.95rem;
+        line-height: 1.2;
+        margin: 0;
+      }
+      .cw-header-title p {
+        font-size: 0.75rem;
+        line-height: 1.2;
+        margin: 0;
+        opacity: 0.8;
+      }
+
+      /* Close icon styles */
+      .cw-close-icon {
+        cursor: pointer;
+        opacity: 0.8;
+        transition: opacity 0.2s ease;
+      }
+      .cw-close-icon:hover {
+        opacity: 1;
       }
 
       /* Input area styles */
@@ -194,6 +201,7 @@
         border-top: 1px solid #e5e7eb;
         background-color: #fff;
         padding: 0.75rem 1rem;
+        height: 60px; /* Fixed height for input area */
       }
       .cw-input-container {
         display: flex;
@@ -201,6 +209,7 @@
         border-radius: 1.5rem;
         padding: 0.5rem;
         transition: all 0.2s ease;
+        position: relative;
       }
       .cw-input-container:focus-within {
         background-color: #fff;
@@ -210,27 +219,40 @@
         flex: 1;
         border: none;
         background: transparent;
-        padding: 0.5rem 0.75rem;
+        padding: 0.5rem 2.5rem 0.5rem 0.75rem;
         font-size: 0.875rem;
         outline: none;
+        height: 20px;
+        line-height: 20px;
       }
       .cw-send-button {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 2.5rem;
-        height: 2.5rem;
+        width: 1.75rem;
+        height: 1.75rem;
         border-radius: 50%;
         border: none;
         outline: none;
         cursor: pointer;
         transition: all 0.2s ease;
+        background: transparent;
       }
       .cw-send-button:hover {
-        transform: scale(1.05);
+        transform: translateY(-50%) scale(1.05);
       }
       .cw-send-button:active {
-        transform: scale(0.95);
+        transform: translateY(-50%) scale(0.95);
+      }
+
+      /* Messages container */
+      .cw-messages-container {
+        height: 380px; /* Fixed height for messages container */
+        overflow-y: auto;
       }
 
       /* Responsive adjustments */
@@ -275,9 +297,7 @@
       this.advancedReplies = [];
       this.sessionId = null;
       this.visitorId = localStorage.getItem('chat_visitor_id') || generateId();
-      this.isTyping = false;
       this.messagePollingInterval = null;
-      this.typingTimeout = null;
       
       // DOM elements
       this.container = null;
@@ -285,9 +305,8 @@
       this.chatWindow = null;
       this.header = null;
       this.messagesContainer = null;
-      this.typingIndicator = null;
       this.form = null;
-      this.textarea = null;
+      this.input = null;
       
       localStorage.setItem('chat_visitor_id', this.visitorId);
       
@@ -345,7 +364,7 @@
 
       // Chat Window
       this.chatWindow = document.createElement('div');
-      this.chatWindow.className = 'cw-chat-window cw-bg-white cw-rounded-lg cw-shadow-lg cw-w-80 cw-sm-w-96 cw-mt-4 cw-flex cw-flex-col cw-overflow-hidden cw-max-h-80vh cw-fixed cw-bottom-4 cw-right-4';
+      this.chatWindow.className = 'cw-chat-window cw-bg-white cw-rounded-lg cw-shadow-lg cw-w-80 cw-sm-w-96 cw-mt-4 cw-flex cw-flex-col cw-overflow-hidden cw-fixed cw-bottom-4 cw-right-4';
 
       // Header
       this.header = document.createElement('div');
@@ -362,10 +381,10 @@
       agentAvatar.innerHTML = `<span class="cw-text-lg" style="color: ${this.settings.primary_color || '#4f46e5'}">${icons.user}</span>`;
 
       const titleDiv = document.createElement('div');
-      titleDiv.className = 'cw-flex cw-flex-col';
+      titleDiv.className = 'cw-header-title';
       titleDiv.innerHTML = `
-        <h3 class="cw-text-white cw-font-semibold cw-text-sm leading-tight">${this.settings.business_name || 'Chat'}</h3>
-        <p class="cw-text-xs cw-text-white cw-opacity-80 leading-tight">Online | ${this.settings.sales_representative || 'Support'}</p>
+        <h3 class="cw-text-white">${this.settings.business_name || 'Chat'}</h3>
+        <p class="cw-text-white">Online | ${this.settings.sales_representative || 'Support'}</p>
       `;
 
       headerLeft.append(agentAvatar, titleDiv);
@@ -373,58 +392,48 @@
       const headerActions = document.createElement('div');
       headerActions.className = 'cw-flex cw-items-center';
 
-      const closeButton = document.createElement('button');
-      closeButton.className = 'cw-text-white cw-focus-outline-none';
-      closeButton.innerHTML = `<span class="cw-w-5 cw-h-5">${icons.x}</span>`;
-      closeButton.setAttribute('aria-label', 'Close chat');
-      closeButton.onclick = () => this.toggleChat();
+      const closeIcon = document.createElement('div');
+      closeIcon.className = 'cw-close-icon cw-text-white';
+      closeIcon.innerHTML = `<span class="cw-w-5 cw-h-5">${icons.x}</span>`;
+      closeIcon.setAttribute('aria-label', 'Close chat');
+      closeIcon.onclick = () => this.toggleChat();
 
-      headerActions.append(closeButton);
+      headerActions.append(closeIcon);
       this.header.append(headerLeft, headerActions);
 
       // Messages Container
       this.messagesContainer = document.createElement('div');
-      this.messagesContainer.className = 'cw-flex-1 cw-p-4 cw-overflow-y-auto cw-max-h-50vh';
-
-      // Typing Indicator
-      this.typingIndicator = document.createElement('div');
-      this.typingIndicator.className = 'cw-typing-indicator cw-px-4 cw-py-2 cw-hidden';
-      this.typingIndicator.innerHTML = '<div class="cw-typing-indicator"><span></span><span></span><span></span></div>';
+      this.messagesContainer.className = 'cw-messages-container cw-flex-1 cw-p-4 cw-overflow-y-auto';
 
       // Input Form
       this.form = document.createElement('form');
       this.form.className = 'cw-input-area';
       this.form.innerHTML = `
         <div class="cw-input-container">
-          <textarea rows="1" placeholder="Type your message..." class="cw-input" aria-label="Message"></textarea>
-          <button type="submit" class="cw-send-button" style="background-color: ${this.settings.primary_color || '#4f46e5'}" aria-label="Send message">
-            <span class="cw-w-5 cw-h-5 cw-text-white">${icons.send}</span>
+          <input type="text" placeholder="Type your message..." class="cw-input" aria-label="Message">
+          <button type="submit" class="cw-send-button" aria-label="Send message">
+            <span class="cw-w-5 cw-h-5" style="color: ${this.settings.primary_color || '#4f46e5'}">${icons.send}</span>
           </button>
         </div>
       `;
 
-      this.textarea = this.form.querySelector('textarea');
-      this.textarea.oninput = () => {
-        this.textarea.style.height = 'auto';
-        this.textarea.style.height = Math.min(this.textarea.scrollHeight, 120) + 'px';
-      };
-      this.textarea.onkeydown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+      this.input = this.form.querySelector('input');
+      this.input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
           e.preventDefault();
           this.form.dispatchEvent(new Event('submit'));
         }
       };
       this.form.onsubmit = (e) => {
         e.preventDefault();
-        if (this.textarea.value.trim()) {
-          this.sendMessage(this.textarea.value);
-          this.textarea.value = '';
-          this.textarea.style.height = 'auto';
+        if (this.input.value.trim()) {
+          this.sendMessage(this.input.value);
+          this.input.value = '';
         }
       };
 
       // Append all elements to chat window
-      this.chatWindow.append(this.header, this.messagesContainer, this.typingIndicator, this.form);
+      this.chatWindow.append(this.header, this.messagesContainer, this.form);
       document.body.appendChild(this.chatWindow);
     }
 
@@ -504,14 +513,11 @@
         this.messagesContainer.appendChild(wrapper);
       }
 
-      // Update typing indicator
-      this.typingIndicator.className = this.isTyping ? 'cw-typing-indicator cw-px-4 cw-py-2' : 'cw-typing-indicator cw-px-4 cw-py-2 cw-hidden';
-
       // Scroll to bottom
       this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
 
-      // Focus textarea
-      setTimeout(() => this.textarea?.focus(), 100);
+      // Focus input
+      setTimeout(() => this.input?.focus(), 100);
     }
 
     toggleChat() {
@@ -639,14 +645,17 @@
         console.error('Error saving user message:', error);
       }
 
-      this.showTypingIndicator();
       const replyText = this.findReply(text.toLowerCase());
       if (replyText) {
-        await this.sendBotReply(replyText);
+        // Add a small delay to make it feel more natural
+        setTimeout(() => {
+          this.sendBotReply(replyText);
+        }, 800);
       } else if (this.settings.fallback_message) {
-        await this.sendBotReply(this.settings.fallback_message);
+        setTimeout(() => {
+          this.sendBotReply(this.settings.fallback_message);
+        }, 800);
       }
-      this.hideTypingIndicator();
     }
 
     findReply(userMessage) {
@@ -670,10 +679,8 @@
     }
 
     async sendBotReply(text) {
-      this.showTypingIndicator();
-      const delay = Math.max(1000, text.length * 50); // Minimum 1s, 50ms per char
+      const delay = Math.max(500, text.length * 30); // Minimum 0.5s, 30ms per char
       await new Promise(resolve => setTimeout(resolve, delay));
-      this.hideTypingIndicator();
 
       const botMessage = { id: generateId(), sender: 'bot', text, timestamp: new Date() };
       this.messages.push(botMessage);
@@ -697,24 +704,6 @@
       } catch (error) {
         console.error('Error saving bot message:', error);
       }
-    }
-
-    showTypingIndicator() {
-      // Clear any existing timeout
-      if (this.typingTimeout) {
-        clearTimeout(this.typingTimeout);
-      }
-      
-      this.isTyping = true;
-      this.updateUI();
-    }
-
-    hideTypingIndicator() {
-      // Set a timeout to ensure the typing indicator is hidden
-      this.typingTimeout = setTimeout(() => {
-        this.isTyping = false;
-        this.updateUI();
-      }, 500);
     }
   }
 
