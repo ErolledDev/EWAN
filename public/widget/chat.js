@@ -169,7 +169,7 @@
         }
         .cw-chat-bubble-user {
           background-color: #f3f4f6;
-          color: white;
+          color: #1f2937;
           margin-left: auto;
           border-bottom-right-radius: 0.25rem;
         }
