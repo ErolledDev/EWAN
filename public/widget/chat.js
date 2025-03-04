@@ -66,19 +66,27 @@
       .cw-chat-window {
         visibility: hidden;
         opacity: 0;
-        transform: translateY(20px);
-        transition: visibility 0s 0.3s, opacity 0.3s ease, transform 0.3s ease;
+        transform: translateY(20px) scale(0.95);
+        transition: visibility 0s 0.3s, opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         pointer-events: none;
+        border-radius: 1.25rem;
+        overflow: hidden;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
       }
       .cw-chat-window.cw-open {
         visibility: visible;
         opacity: 1;
-        transform: translateY(0);
-        transition: visibility 0s, opacity 0.3s ease, transform 0.3s ease;
+        transform: translateY(0) scale(1);
+        transition: visibility 0s, opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         pointer-events: auto;
       }
 
       /* Typing indicator */
+      .cw-typing-indicator {
+        display: flex;
+        align-items: center;
+        padding-left: 0.75rem;
+      }
       .cw-typing-indicator span {
         height: 8px;
         width: 8px;
@@ -101,9 +109,10 @@
         position: relative;
         max-width: 80%;
         padding: 0.75rem 1rem;
-        border-radius: 1rem;
+        border-radius: 1.25rem;
         margin-bottom: 0.25rem;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        line-height: 1.5;
       }
       .cw-chat-bubble-user {
         background-color: #2563eb;
@@ -155,6 +164,73 @@
         border: 8px solid transparent;
         border-right-color: #10b981;
         border-bottom-color: #10b981;
+      }
+
+      /* Chat button styles */
+      .cw-chat-button {
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+        border: none;
+        outline: none;
+        position: fixed;
+        bottom: 1rem;
+        right: 1rem;
+        z-index: 2147483647;
+      }
+      .cw-chat-button:hover {
+        transform: scale(1.05);
+      }
+      .cw-chat-button:active {
+        transform: scale(0.95);
+      }
+
+      /* Header styles */
+      .cw-header {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      /* Input area styles */
+      .cw-input-area {
+        border-top: 1px solid #e5e7eb;
+        background-color: #fff;
+        padding: 0.75rem 1rem;
+      }
+      .cw-input-container {
+        display: flex;
+        background-color: #f3f4f6;
+        border-radius: 1.5rem;
+        padding: 0.5rem;
+        transition: all 0.2s ease;
+      }
+      .cw-input-container:focus-within {
+        background-color: #fff;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+      }
+      .cw-input {
+        flex: 1;
+        border: none;
+        background: transparent;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+        outline: none;
+      }
+      .cw-send-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 50%;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .cw-send-button:hover {
+        transform: scale(1.05);
+      }
+      .cw-send-button:active {
+        transform: scale(0.95);
       }
 
       /* Responsive adjustments */
@@ -259,23 +335,23 @@
 
       // Chat Button
       this.chatButton = document.createElement('button');
-      this.chatButton.className = 'cw-flex cw-items-center cw-justify-center cw-w-14 cw-h-14 cw-rounded-full cw-shadow-lg cw-transition-all cw-focus-outline-none';
+      this.chatButton.className = 'cw-chat-button cw-flex cw-items-center cw-justify-center cw-w-14 cw-h-14 cw-rounded-full cw-shadow-lg cw-transition-all cw-focus-outline-none';
       this.chatButton.style.backgroundColor = this.settings.primary_color || '#4f46e5';
       this.chatButton.innerHTML = `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.messageCircle}</span>`;
       this.chatButton.setAttribute('aria-label', 'Open chat');
       this.chatButton.onclick = () => this.toggleChat();
-      this.container.appendChild(this.chatButton);
+      document.body.appendChild(this.chatButton);
 
       // Chat Window
       this.chatWindow = document.createElement('div');
-      this.chatWindow.className = 'cw-chat-window cw-bg-white cw-rounded-lg cw-shadow-lg cw-w-80 cw-sm-w-96 cw-mt-4 cw-flex cw-flex-col cw-overflow-hidden cw-max-h-80vh';
+      this.chatWindow.className = 'cw-chat-window cw-bg-white cw-rounded-lg cw-shadow-lg cw-w-80 cw-sm-w-96 cw-mt-4 cw-flex cw-flex-col cw-overflow-hidden cw-max-h-80vh cw-fixed cw-bottom-4 cw-right-4';
 
       // Header
       this.header = document.createElement('div');
-      this.header.className = 'cw-p-3 cw-flex cw-justify-between cw-items-center';
+      this.header.className = 'cw-header cw-p-3 cw-flex cw-justify-between cw-items-center';
       this.header.style.backgroundColor = this.settings.primary_color || '#4f46e5';
-      this.header.style.borderTopLeftRadius = '0.5rem';
-      this.header.style.borderTopRightRadius = '0.5rem';
+      this.header.style.borderTopLeftRadius = '1.25rem';
+      this.header.style.borderTopRightRadius = '1.25rem';
 
       const headerLeft = document.createElement('div');
       headerLeft.className = 'cw-flex cw-items-center';
@@ -311,16 +387,16 @@
 
       // Typing Indicator
       this.typingIndicator = document.createElement('div');
-      this.typingIndicator.className = 'cw-px-4 cw-py-2 cw-hidden';
+      this.typingIndicator.className = 'cw-typing-indicator cw-px-4 cw-py-2 cw-hidden';
       this.typingIndicator.innerHTML = '<div class="cw-typing-indicator"><span></span><span></span><span></span></div>';
 
       // Input Form
       this.form = document.createElement('form');
-      this.form.className = 'cw-p-3 cw-border-t cw-border-gray-200';
+      this.form.className = 'cw-input-area';
       this.form.innerHTML = `
-        <div class="cw-flex cw-items-end">
-          <textarea rows="1" placeholder="Type your message..." class="cw-flex-1 cw-px-3 cw-py-2 cw-border cw-border-gray-200 cw-rounded-lg cw-focus-outline-none cw-focus-ring-2 cw-resize-none" aria-label="Message"></textarea>
-          <button type="submit" class="cw-ml-2 cw-p-2 cw-rounded-full cw-focus-outline-none" style="background-color: ${this.settings.primary_color || '#4f46e5'}" aria-label="Send message">
+        <div class="cw-input-container">
+          <textarea rows="1" placeholder="Type your message..." class="cw-input" aria-label="Message"></textarea>
+          <button type="submit" class="cw-send-button" style="background-color: ${this.settings.primary_color || '#4f46e5'}" aria-label="Send message">
             <span class="cw-w-5 cw-h-5 cw-text-white">${icons.send}</span>
           </button>
         </div>
@@ -348,7 +424,7 @@
 
       // Append all elements to chat window
       this.chatWindow.append(this.header, this.messagesContainer, this.typingIndicator, this.form);
-      this.container.appendChild(this.chatWindow);
+      document.body.appendChild(this.chatWindow);
     }
 
     updateUI() {
@@ -356,9 +432,7 @@
 
       // Update chat button
       this.chatButton.style.backgroundColor = this.settings.primary_color || '#4f46e5';
-      this.chatButton.innerHTML = this.isOpen ? 
-        `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.x}</span>` : 
-        `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.messageCircle}</span>`;
+      this.chatButton.style.display = this.isOpen ? 'none' : 'flex';
       this.chatButton.setAttribute('aria-label', this.isOpen ? 'Close chat' : 'Open chat');
 
       // Update chat window visibility
@@ -430,7 +504,7 @@
       }
 
       // Update typing indicator
-      this.typingIndicator.className = this.isTyping ? 'cw-px-4 cw-py-2' : 'cw-px-4 cw-py-2 cw-hidden';
+      this.typingIndicator.className = this.isTyping ? 'cw-typing-indicator cw-px-4 cw-py-2' : 'cw-typing-indicator cw-px-4 cw-py-2 cw-hidden';
 
       // Scroll to bottom
       this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
