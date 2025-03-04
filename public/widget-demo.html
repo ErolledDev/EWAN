@@ -41,6 +41,33 @@
     pre {
       margin: 0;
     }
+    .features {
+      margin-top: 2rem;
+    }
+    .feature {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+    .feature-icon {
+      background-color: #e0e7ff;
+      color: #4f46e5;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 1rem;
+      flex-shrink: 0;
+    }
+    .feature-text {
+      flex: 1;
+    }
+    .feature-title {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
   </style>
 </head>
 <body>
@@ -67,6 +94,42 @@
       </div>
       
       <p>Replace <code>YOUR_USER_ID</code> with your user ID from the dashboard.</p>
+      
+      <div class="features">
+        <h3>Key Features</h3>
+        
+        <div class="feature">
+          <div class="feature-icon">✓</div>
+          <div class="feature-text">
+            <div class="feature-title">Auto-Reply</div>
+            <p>Set up keyword-based responses to common questions</p>
+          </div>
+        </div>
+        
+        <div class="feature">
+          <div class="feature-icon">✓</div>
+          <div class="feature-text">
+            <div class="feature-title">Advanced Replies</div>
+            <p>Create rich responses with HTML and clickable links</p>
+          </div>
+        </div>
+        
+        <div class="feature">
+          <div class="feature-icon">✓</div>
+          <div class="feature-text">
+            <div class="feature-title">AI Mode</div>
+            <p>Let AI handle complex queries with context about your business</p>
+          </div>
+        </div>
+        
+        <div class="feature">
+          <div class="feature-icon">✓</div>
+          <div class="feature-text">
+            <div class="feature-title">Live Chat</div>
+            <p>Jump in and chat directly with your visitors when needed</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   

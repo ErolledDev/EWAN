@@ -432,11 +432,27 @@
           })
         ]);
 
-        this.settings = (await settingsResp.json())[0] || {};
+        const settingsData = await settingsResp.json();
+        this.settings = settingsData.length > 0 ? settingsData[0] : {
+          business_name: 'Chat Support',
+          primary_color: '#4f46e5',
+          welcome_message: 'Welcome! How can we help you today?',
+          sales_representative: 'Support Agent',
+          fallback_message: "I'll connect you with our team for assistance."
+        };
+        
         this.autoReplies = await autoRepliesResp.json() || [];
         this.advancedReplies = await advancedRepliesResp.json() || [];
       } catch (error) {
         console.error('Error fetching widget data:', error);
+        // Set default settings if fetch fails
+        this.settings = {
+          business_name: 'Chat Support',
+          primary_color: '#4f46e5',
+          welcome_message: 'Welcome! How can we help you today?',
+          sales_representative: 'Support Agent',
+          fallback_message: "I'll connect you with our team for assistance."
+        };
       }
     }
 
@@ -458,7 +474,7 @@
         this.chatButton.appendChild(notificationDot);
       }
       
-      document.body.appendChild(this.chatButton);
+      this.container.appendChild(this.chatButton);
 
       // Chat Window
       this.chatWindow = document.createElement('div');
@@ -532,7 +548,7 @@
 
       // Append all elements to chat window
       this.chatWindow.append(this.header, this.messagesContainer, this.form);
-      document.body.appendChild(this.chatWindow);
+      this.container.appendChild(this.chatWindow);
     }
 
     updateUI() {
@@ -713,30 +729,50 @@
     async createChatSession() {
       if (!this.sessionId) {
         try {
-          const resp = await fetch(`${this.supabase.url}/rest/v1/chat_sessions`, {
-            method: 'POST',
-            headers: {
-              'apikey': this.supabase.key,
-              'Authorization': `Bearer ${this.supabase.key}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            },
-            body: JSON.stringify({
-              user_id: this.userId,
-              visitor_id: this.visitorId,
-              status: 'active',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-          });
-          const data = await resp.json();
-          this.sessionId = data[0].id;
-          this.startMessagePolling();
+          // First check if there's an existing active session for this visitor
+          const existingSessionResp = await fetch(
+            `${this.supabase.url}/rest/v1/chat_sessions?user_id=eq.${this.userId}&visitor_id=eq.${this.visitorId}&status=eq.active&order=created_at.desc&limit=1`, 
+            {
+              headers: { 'apikey': this.supabase.key, 'Authorization': `Bearer ${this.supabase.key}` }
+            }
+          );
+          
+          const existingSessions = await existingSessionResp.json();
+          
+          if (existingSessions && existingSessions.length > 0) {
+            // Use existing session
+            this.sessionId = existingSessions[0].id;
+            await this.fetchMessages();
+          } else {
+            // Create new session
+            const resp = await fetch(`${this.supabase.url}/rest/v1/chat_sessions`, {
+              method: 'POST',
+              headers: {
+                'apikey': this.supabase.key,
+                'Authorization': `Bearer ${this.supabase.key}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify({
+                user_id: this.userId,
+                visitor_id: this.visitorId,
+                status: 'active',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                metadata: {}
+              })
+            });
+            
+            const data = await resp.json();
+            this.sessionId = data[0].id;
 
-          // Only send welcome message if configured
-          if (this.settings.welcome_message) {
-            await this.sendBotReply(this.settings.welcome_message);
+            // Only send welcome message if configured and this is a new session
+            if (this.settings.welcome_message) {
+              await this.sendBotReply(this.settings.welcome_message);
+            }
           }
+          
+          this.startMessagePolling();
         } catch (error) {
           console.error('Error creating chat session:', error);
         }
@@ -810,7 +846,26 @@
     }
 
     findReply(userMessage) {
-      for (const reply of [...this.autoReplies, ...this.advancedReplies]) {
+      // First check auto replies
+      for (const reply of this.autoReplies) {
+        const keywords = reply.keywords;
+        if (reply.matching_type === 'word_match') {
+          if (keywords.some(k => userMessage.includes(k.toLowerCase()))) {
+            return reply.response;
+          }
+        } else if (reply.matching_type === 'regex') {
+          try {
+            if (keywords.some(k => new RegExp(k, 'i').test(userMessage))) {
+              return reply.response;
+            }
+          } catch (e) {
+            console.error('Invalid regex:', e);
+          }
+        }
+      }
+      
+      // Then check advanced replies
+      for (const reply of this.advancedReplies) {
         const keywords = reply.keywords;
         if (reply.matching_type === 'word_match') {
           if (keywords.some(k => userMessage.includes(k.toLowerCase()))) {
