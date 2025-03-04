@@ -68,6 +68,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [visitorId, setVisitorId] = useState<string>('');
   const [isTyping, setIsTyping] = useState(false);
+  const [hasUserSentFirstMessage, setHasUserSentFirstMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Create Supabase client
@@ -305,6 +306,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
     };
     
     setMessages(prev => [...prev, userMessage]);
+    setHasUserSentFirstMessage(true);
     
     // Save user message to database
     try {
@@ -487,14 +489,14 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
             style={{ backgroundColor: settings.primary_color || '#4f46e5' }}
           >
             <div className="flex items-center">
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mr-2">
+              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center mr-3">
                 <span className="text-lg" style={{ color: settings.primary_color || '#4f46e5' }}>
                   <LucideIcon icon="MessageCircle" className="w-6 h-6" />
                 </span>
               </div>
               <div>
-                <h3 className="text-white font-medium">{settings.business_name || 'Chat'}</h3>
-                <p className="text-xs text-white opacity-70">
+                <h3 className="text-white font-medium text-lg">{settings.business_name || 'Chat'}</h3>
+                <p className="text-sm text-white opacity-90">
                   {settings.sales_representative || 'Support'} | Online
                 </p>
               </div>
@@ -579,17 +581,17 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
           
           {/* Input */}
           <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200">
-            <div className="flex">
+            <div className="flex relative">
               <input
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Type your message..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-l-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 pr-12"
               />
               <button
                 type="submit"
-                className="px-4 py-2 border border-transparent rounded-r-md focus:outline-none"
+                className="absolute right-0 top-1/2 transform -translate-y-1/2 px-4 py-2 rounded-r-md focus:outline-none mr-1"
                 style={{ backgroundColor: settings.primary_color || '#4f46e5' }}
               >
                 <LucideIcon icon="Send" className="w-5 h-5 text-white" />

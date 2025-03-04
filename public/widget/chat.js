@@ -201,25 +201,25 @@
       /* Header styles */
       .cw-header {
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        height: 60px; /* Fixed height for header */
+        height: 70px; /* Increased height for header */
       }
       
-      /* Header title styles - compact */
+      /* Header title styles - improved */
       .cw-header-title {
         display: flex;
         flex-direction: column;
       }
       .cw-header-title h3 {
         font-weight: 600;
-        font-size: 0.95rem;
-        line-height: 1.2;
+        font-size: 1.05rem;
+        line-height: 1.3;
         margin: 0;
       }
       .cw-header-title p {
-        font-size: 0.75rem;
-        line-height: 1.2;
+        font-size: 0.8rem;
+        line-height: 1.3;
         margin: 0;
-        opacity: 0.8;
+        opacity: 0.9;
       }
 
       /* Close icon styles */
@@ -237,13 +237,13 @@
         border-top: 1px solid #e5e7eb;
         background-color: #fff;
         padding: 0.75rem 1rem;
-        height: 60px; /* Fixed height for input area */
+        height: 70px; /* Increased height for input area */
       }
       .cw-input-container {
         display: flex;
         background-color: #f3f4f6;
         border-radius: 1.5rem;
-        padding: 0.5rem;
+        padding: 0.5rem 0.75rem;
         transition: all 0.2s ease;
         position: relative;
       }
@@ -255,11 +255,11 @@
         flex: 1;
         border: none;
         background: transparent;
-        padding: 0.5rem 2.5rem 0.5rem 0.75rem;
-        font-size: 0.875rem;
+        padding: 0.5rem 3rem 0.5rem 0.5rem;
+        font-size: 0.95rem;
         outline: none;
-        height: 20px;
-        line-height: 20px;
+        height: 24px;
+        line-height: 24px;
       }
       .cw-send-button {
         position: absolute;
@@ -269,8 +269,8 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 1.75rem;
-        height: 1.75rem;
+        width: 2.25rem;
+        height: 2.25rem;
         border-radius: 50%;
         border: none;
         outline: none;
@@ -287,7 +287,7 @@
 
       /* Messages container */
       .cw-messages-container {
-        height: 380px; /* Fixed height for messages container */
+        height: 360px; /* Adjusted height for messages container */
         overflow-y: auto;
         background-color: #f9fafb;
         background-image: 
@@ -387,6 +387,7 @@
       this.messagePollingInterval = null;
       this.showNotificationDot = !localStorage.getItem('chat_notification_seen');
       this.isTyping = false;
+      this.hasUserSentFirstMessage = false; // Track if user has sent first message
       
       // DOM elements
       this.container = null;
@@ -474,7 +475,7 @@
       headerLeft.className = 'cw-flex cw-items-center';
 
       const agentAvatar = document.createElement('div');
-      agentAvatar.className = 'cw-w-8 cw-h-8 cw-rounded-full cw-bg-white cw-flex cw-items-center cw-justify-center cw-mr-2';
+      agentAvatar.className = 'cw-w-10 cw-h-10 cw-rounded-full cw-bg-white cw-flex cw-items-center cw-justify-center cw-mr-3';
       agentAvatar.innerHTML = `<span class="cw-text-lg" style="color: ${this.settings.primary_color || '#4f46e5'}">${icons.user}</span>`;
 
       const titleDiv = document.createElement('div');
@@ -698,6 +699,11 @@
         if (JSON.stringify(formatted) !== JSON.stringify(this.messages)) {
           this.messages = formatted;
           this.updateChatContent();
+          
+          // Check if user has sent a message
+          if (formatted.some(msg => msg.sender === 'user')) {
+            this.hasUserSentFirstMessage = true;
+          }
         }
       } catch (error) {
         console.error('Error fetching messages:', error);
@@ -727,6 +733,7 @@
           this.sessionId = data[0].id;
           this.startMessagePolling();
 
+          // Only send welcome message if configured
           if (this.settings.welcome_message) {
             await this.sendBotReply(this.settings.welcome_message);
           }
@@ -742,6 +749,9 @@
       const userMessage = { id: generateId(), sender: 'user', text, timestamp: new Date() };
       this.messages.push(userMessage);
       this.updateChatContent();
+      
+      // Mark that user has sent their first message
+      this.hasUserSentFirstMessage = true;
 
       try {
         await Promise.all([
