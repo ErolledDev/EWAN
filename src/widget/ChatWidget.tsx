@@ -52,6 +52,12 @@ type Message = {
   timestamp: Date;
 };
 
+// Group messages by sender for better display
+type MessageGroup = {
+  sender: 'user' | 'bot' | 'agent';
+  messages: Message[];
+};
+
 const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
@@ -61,6 +67,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
   const [advancedReplies, setAdvancedReplies] = useState<any[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [visitorId, setVisitorId] = useState<string>('');
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Create Supabase client
@@ -254,6 +261,32 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
     }
   }, [messages]);
   
+  // Group messages by sender
+  const groupMessages = (messages: Message[]): MessageGroup[] => {
+    const groups: MessageGroup[] = [];
+    let currentGroup: MessageGroup | null = null;
+    
+    messages.forEach(message => {
+      if (!currentGroup || currentGroup.sender !== message.sender) {
+        if (currentGroup) {
+          groups.push(currentGroup);
+        }
+        currentGroup = {
+          sender: message.sender,
+          messages: [message]
+        };
+      } else {
+        currentGroup.messages.push(message);
+      }
+    });
+    
+    if (currentGroup) {
+      groups.push(currentGroup);
+    }
+    
+    return groups;
+  };
+  
   const toggleChat = () => {
     setIsOpen(!isOpen);
   };
@@ -271,7 +304,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
       timestamp: new Date(),
     };
     
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages(prev => [...prev, userMessage]);
     
     // Save user message to database
     try {
@@ -290,6 +323,9 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
     // Clear input
     setMessage('');
     
+    // Show typing indicator
+    setIsTyping(true);
+    
     // Process the message to find a reply
     const userMessageLower = message.toLowerCase();
     let replied = false;
@@ -301,7 +337,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
       if (reply.matching_type === 'word_match') {
         // Simple word match
         if (keywords.some((keyword: string) => userMessageLower.includes(keyword.toLowerCase()))) {
-          await sendBotReply(reply.response);
+          setTimeout(() => {
+            sendBotReply(reply.response);
+            setIsTyping(false);
+          }, 1000);
           replied = true;
           break;
         }
@@ -311,7 +350,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
           for (const keyword of keywords) {
             const regex = new RegExp(keyword, 'i');
             if (regex.test(userMessageLower)) {
-              await sendBotReply(reply.response);
+              setTimeout(() => {
+                sendBotReply(reply.response);
+                setIsTyping(false);
+              }, 1000);
               replied = true;
               break;
             }
@@ -332,10 +374,16 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
         if (reply.matching_type === 'word_match') {
           if (keywords.some((keyword: string) => userMessageLower.includes(keyword.toLowerCase()))) {
             if (reply.response_type === 'text') {
-              await sendBotReply(reply.response);
+              setTimeout(() => {
+                sendBotReply(reply.response);
+                setIsTyping(false);
+              }, 1000);
             } else if (reply.response_type === 'url') {
               const linkText = reply.button_text || 'Click here';
-              await sendBotReply(`<a href="${reply.response}" target="_blank" class="text-blue-600 hover:underline">${linkText}</a>`);
+              setTimeout(() => {
+                sendBotReply(`<a href="${reply.response}" target="_blank" class="text-blue-600 hover:underline">${linkText}</a>`);
+                setIsTyping(false);
+              }, 1000);
             }
             replied = true;
             break;
@@ -346,10 +394,16 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
               const regex = new RegExp(keyword, 'i');
               if (regex.test(userMessageLower)) {
                 if (reply.response_type === 'text') {
-                  await sendBotReply(reply.response);
+                  setTimeout(() => {
+                    sendBotReply(reply.response);
+                    setIsTyping(false);
+                  }, 1000);
                 } else if (reply.response_type === 'url') {
                   const linkText = reply.button_text || 'Click here';
-                  await sendBotReply(`<a href="${reply.response}" target="_blank" class="text-blue-600 hover:underline">${linkText}</a>`);
+                  setTimeout(() => {
+                    sendBotReply(`<a href="${reply.response}" target="_blank" class="text-blue-600 hover:underline">${linkText}</a>`);
+                    setIsTyping(false);
+                  }, 1000);
                 }
                 replied = true;
                 break;
@@ -363,10 +417,17 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
       }
     }
     
-    // If no reply matched and AI mode is enabled, we would call the AI API here
-    // For now, just send the fallback message if nothing matched
+    // If no reply matched, send fallback message
     if (!replied && settings?.fallback_message) {
-      await sendBotReply(settings.fallback_message);
+      setTimeout(() => {
+        sendBotReply(settings.fallback_message);
+        setIsTyping(false);
+      }, 1000);
+    } else if (!replied) {
+      // If no fallback message, hide typing indicator
+      setTimeout(() => {
+        setIsTyping(false);
+      }, 1000);
     }
   };
   
@@ -379,7 +440,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
       timestamp: new Date(),
     };
     
-    setMessages((prev) => [...prev, botMessage]);
+    setMessages(prev => [...prev, botMessage]);
     
     // Save bot message to database
     try {
@@ -400,12 +461,14 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
     return null; // Don't render until settings are loaded
   }
   
+  const messageGroups = groupMessages(messages);
+  
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
       {/* Chat button */}
       <button
         onClick={toggleChat}
-        className="flex items-center justify-center w-14 h-14 rounded-full shadow-lg focus:outline-none"
+        className="flex items-center justify-center w-14 h-14 rounded-full shadow-lg focus:outline-none transition-all"
         style={{ backgroundColor: settings.primary_color || '#4f46e5' }}
       >
         {isOpen ? (
@@ -417,18 +480,30 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
       
       {/* Chat window */}
       {isOpen && (
-        <div className="bg-white rounded-lg shadow-xl w-80 sm:w-96 mt-4 flex flex-col overflow-hidden max-h-[80vh]">
+        <div className="bg-white rounded-lg shadow-xl w-80 sm:w-96 mt-4 flex flex-col overflow-hidden max-h-[80vh] animate-fade-in">
           {/* Header */}
           <div 
             className="p-4 flex justify-between items-center"
             style={{ backgroundColor: settings.primary_color || '#4f46e5' }}
           >
-            <h3 className="text-white font-medium">{settings.business_name || 'Chat'}</h3>
+            <div className="flex items-center">
+              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mr-2">
+                <span className="text-lg" style={{ color: settings.primary_color || '#4f46e5' }}>
+                  <LucideIcon icon="MessageCircle" className="w-6 h-6" />
+                </span>
+              </div>
+              <div>
+                <h3 className="text-white font-medium">{settings.business_name || 'Chat'}</h3>
+                <p className="text-xs text-white opacity-70">
+                  {settings.sales_representative || 'Support'} | Online
+                </p>
+              </div>
+            </div>
             <button 
               onClick={toggleChat}
               className="text-white focus:outline-none"
             >
-              <LucideIcon icon="ChevronDown" className="w-5 h-5" />
+              <LucideIcon icon="X" className="w-5 h-5" />
             </button>
           </div>
           
@@ -436,42 +511,67 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
           <div className="flex-1 p-4 overflow-y-auto max-h-[50vh]">
             {messages.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
-                Send a message to start chatting
+                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                  <LucideIcon icon="MessageCircle" className="w-8 h-8 text-gray-400" />
+                </div>
+                <h4 className="font-medium text-gray-700 mb-1">Start a conversation</h4>
+                <p className="text-sm">Send a message to get started</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                        msg.sender === 'user'
-                          ? 'bg-blue-100 text-blue-800'
-                          : msg.sender === 'agent'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {msg.sender === 'bot' || msg.sender === 'agent' ? (
-                        <div className="text-xs font-medium mb-1">
+              <div className="space-y-6">
+                {messageGroups.map((group, groupIndex) => (
+                  <div key={groupIndex} className={`flex ${group.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className="flex flex-col">
+                      {/* Only show sender name once per group for bot/agent messages */}
+                      {group.sender !== 'user' && (
+                        <span className="text-xs font-medium text-gray-600 ml-2 mb-1">
                           {settings.sales_representative || 'Support'}
-                        </div>
-                      ) : null}
-                      
-                      {msg.sender === 'bot' ? (
-                        <div dangerouslySetInnerHTML={{ __html: msg.text }} />
-                      ) : (
-                        <div>{msg.text}</div>
+                        </span>
                       )}
                       
-                      <div className="text-xs mt-1 opacity-70">
-                        {format(msg.timestamp, 'h:mm a')}
+                      {/* Messages in this group */}
+                      <div className="space-y-1">
+                        {group.messages.map((msg, msgIndex) => (
+                          <div
+                            key={msg.id}
+                            className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                              msg.sender === 'user'
+                                ? 'bg-blue-100 text-blue-800 ml-auto'
+                                : msg.sender === 'agent'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {msg.sender === 'bot' ? (
+                              <div dangerouslySetInnerHTML={{ __html: msg.text }} />
+                            ) : (
+                              <div>{msg.text}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* Timestamp outside the bubble, only once per group */}
+                      <div className={`text-xs text-gray-500 mt-1 ${group.sender === 'user' ? 'text-right mr-1' : 'text-left ml-1'}`}>
+                        {format(group.messages[group.messages.length - 1].timestamp, 'h:mm a')}
                       </div>
                     </div>
                   </div>
                 ))}
+                
+                {/* Typing indicator */}
+                {isTyping && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-100 rounded-full px-3 py-2">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div ref={messagesEndRef} />
               </div>
             )}
