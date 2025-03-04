@@ -277,6 +277,7 @@
       this.visitorId = localStorage.getItem('chat_visitor_id') || generateId();
       this.isTyping = false;
       this.messagePollingInterval = null;
+      this.typingTimeout = null;
       
       // DOM elements
       this.container = null;
@@ -699,13 +700,21 @@
     }
 
     showTypingIndicator() {
+      // Clear any existing timeout
+      if (this.typingTimeout) {
+        clearTimeout(this.typingTimeout);
+      }
+      
       this.isTyping = true;
       this.updateUI();
     }
 
     hideTypingIndicator() {
-      this.isTyping = false;
-      this.updateUI();
+      // Set a timeout to ensure the typing indicator is hidden
+      this.typingTimeout = setTimeout(() => {
+        this.isTyping = false;
+        this.updateUI();
+      }, 500);
     }
   }
 
