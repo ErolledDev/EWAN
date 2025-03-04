@@ -168,7 +168,7 @@
           overflow-wrap: break-word;
         }
         .cw-chat-bubble-user {
-          background-color: #2563eb;
+          background-color: #f3f4f6;
           color: white;
           margin-left: auto;
           border-bottom-right-radius: 0.25rem;
@@ -215,12 +215,12 @@
         }
         .cw-header-title h3 {
           font-weight: 600;
-          font-size: 1rem;
+          font-size: 1.1rem;
           line-height: 1.3;
           margin: 0;
         }
         .cw-header-title p {
-          font-size: 0.8rem;
+          font-size: 0.9rem;
           line-height: 1.3;
           margin: 0;
           opacity: 0.9;
