@@ -49,7 +49,7 @@
       .cw-mr-2 { margin-right: 0.5rem; }
       .cw-ml-2 { margin-left: 0.5rem; }
       .cw-space-y-4 > * + * { margin-top: 1rem; }
-      .cw-shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
+      .cw-shadow-lg { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
       .cw-border-t { border-top-width: 1px; }
       .cw-border-gray-200 { border-color: #e5e7eb; }
       .cw-overflow-hidden { overflow: hidden; }
@@ -103,7 +103,7 @@
         padding: 0.75rem 1rem;
         border-radius: 1rem;
         margin-bottom: 0.25rem;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
       }
       .cw-chat-bubble-user {
         background-color: #2563eb;
@@ -259,7 +259,7 @@
 
       // Chat Button
       this.chatButton = document.createElement('button');
-      this.chatButton.className = 'cw-flex cw-items-center cw-justify-center cw-w-14 cw-h-14 cw-rounded-full cw-shadow-xl cw-transition-all cw-focus-outline-none cw-focus-ring-2';
+      this.chatButton.className = 'cw-flex cw-items-center cw-justify-center cw-w-14 cw-h-14 cw-rounded-full cw-shadow-lg cw-transition-all cw-focus-outline-none';
       this.chatButton.style.backgroundColor = this.settings.primary_color || '#4f46e5';
       this.chatButton.innerHTML = `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.messageCircle}</span>`;
       this.chatButton.setAttribute('aria-label', 'Open chat');
@@ -268,11 +268,11 @@
 
       // Chat Window
       this.chatWindow = document.createElement('div');
-      this.chatWindow.className = 'cw-chat-window cw-bg-white cw-rounded-lg cw-shadow-xl cw-w-80 cw-sm-w-96 cw-mt-4 cw-flex cw-flex-col cw-overflow-hidden cw-max-h-80vh';
+      this.chatWindow.className = 'cw-chat-window cw-bg-white cw-rounded-lg cw-shadow-lg cw-w-80 cw-sm-w-96 cw-mt-4 cw-flex cw-flex-col cw-overflow-hidden cw-max-h-80vh';
 
       // Header
       this.header = document.createElement('div');
-      this.header.className = 'cw-p-4 cw-flex cw-justify-between cw-items-center';
+      this.header.className = 'cw-p-3 cw-flex cw-justify-between cw-items-center';
       this.header.style.backgroundColor = this.settings.primary_color || '#4f46e5';
       this.header.style.borderTopLeftRadius = '0.5rem';
       this.header.style.borderTopRightRadius = '0.5rem';
@@ -281,19 +281,20 @@
       headerLeft.className = 'cw-flex cw-items-center';
 
       const agentAvatar = document.createElement('div');
-      agentAvatar.className = 'cw-w-10 cw-h-10 cw-rounded-full cw-bg-white cw-flex cw-items-center cw-justify-center cw-mr-2';
+      agentAvatar.className = 'cw-w-8 cw-h-8 cw-rounded-full cw-bg-white cw-flex cw-items-center cw-justify-center cw-mr-2';
       agentAvatar.innerHTML = `<span class="cw-text-lg" style="color: ${this.settings.primary_color || '#4f46e5'}">${icons.user}</span>`;
 
       const titleDiv = document.createElement('div');
+      titleDiv.className = 'cw-flex cw-flex-col';
       titleDiv.innerHTML = `
-        <h3 class="cw-text-white cw-font-semibold">${this.settings.business_name || 'Chat'}</h3>
-        <p class="cw-text-xs cw-text-white">Online | ${this.settings.sales_representative || 'Support'}</p>
+        <h3 class="cw-text-white cw-font-semibold cw-text-sm leading-tight">${this.settings.business_name || 'Chat'}</h3>
+        <p class="cw-text-xs cw-text-white cw-opacity-80 leading-tight">Online | ${this.settings.sales_representative || 'Support'}</p>
       `;
 
       headerLeft.append(agentAvatar, titleDiv);
 
       const headerActions = document.createElement('div');
-      headerActions.className = 'cw-flex cw-items-center cw-space-x-2';
+      headerActions.className = 'cw-flex cw-items-center';
 
       const closeButton = document.createElement('button');
       closeButton.className = 'cw-text-white cw-focus-outline-none';
@@ -319,7 +320,7 @@
       this.form.innerHTML = `
         <div class="cw-flex cw-items-end">
           <textarea rows="1" placeholder="Type your message..." class="cw-flex-1 cw-px-3 cw-py-2 cw-border cw-border-gray-200 cw-rounded-lg cw-focus-outline-none cw-focus-ring-2 cw-resize-none" aria-label="Message"></textarea>
-          <button type="submit" class="cw-ml-2 cw-p-2 cw-rounded-full cw-focus-outline-none cw-focus-ring-2" style="background-color: ${this.settings.primary_color || '#4f46e5'}" aria-label="Send message">
+          <button type="submit" class="cw-ml-2 cw-p-2 cw-rounded-full cw-focus-outline-none" style="background-color: ${this.settings.primary_color || '#4f46e5'}" aria-label="Send message">
             <span class="cw-w-5 cw-h-5 cw-text-white">${icons.send}</span>
           </button>
         </div>
