@@ -388,6 +388,9 @@
       this.showNotificationDot = !localStorage.getItem('chat_notification_seen');
       this.isTyping = false;
       this.hasUserSentFirstMessage = false; // Track if user has sent first message
+      this.isInitialized = false; // Track if widget is fully initialized
+      this.retryCount = 0; // Track retry attempts for session creation
+      this.maxRetries = 3; // Maximum number of retries
       
       // DOM elements
       this.container = null;
@@ -413,9 +416,30 @@
       this.container = document.createElement('div');
       this.container.className = 'cw-fixed cw-bottom-4 cw-right-4 cw-z-50 cw-flex cw-flex-col cw-items-end';
       document.body.appendChild(this.container);
-      await this.fetchWidgetData();
-      this.createChatElements();
-      this.updateUI();
+      
+      try {
+        await this.fetchWidgetData();
+        this.createChatElements();
+        this.updateUI();
+        this.isInitialized = true;
+        
+        // Check for existing session
+        await this.checkExistingSession();
+      } catch (error) {
+        console.error('Error initializing chat widget:', error);
+        // Retry initialization after a delay
+        setTimeout(() => this.retryInitialization(), 3000);
+      }
+    }
+    
+    retryInitialization() {
+      if (this.retryCount < this.maxRetries) {
+        this.retryCount++;
+        console.log(`Retrying initialization (${this.retryCount}/${this.maxRetries})...`);
+        this.init();
+      } else {
+        console.error('Failed to initialize chat widget after multiple attempts');
+      }
     }
 
     async fetchWidgetData() {
@@ -431,6 +455,10 @@
             headers: { 'apikey': this.supabase.key, 'Authorization': `Bearer ${this.supabase.key}` }
           })
         ]);
+
+        if (!settingsResp.ok || !autoRepliesResp.ok || !advancedRepliesResp.ok) {
+          throw new Error('Failed to fetch widget data');
+        }
 
         const settingsData = await settingsResp.json();
         this.settings = settingsData.length > 0 ? settingsData[0] : {
@@ -703,6 +731,11 @@
         const resp = await fetch(`${this.supabase.url}/rest/v1/chat_messages?chat_session_id=eq.${this.sessionId}&order=created_at.asc`, {
           headers: { 'apikey': this.supabase.key, 'Authorization': `Bearer ${this.supabase.key}` }
         });
+        
+        if (!resp.ok) {
+          throw new Error('Failed to fetch messages');
+        }
+        
         const messages = await resp.json();
         const formatted = messages.map(msg => ({
           id: msg.id,
@@ -725,11 +758,11 @@
         console.error('Error fetching messages:', error);
       }
     }
-
-    async createChatSession() {
-      if (!this.sessionId) {
+    
+    async checkExistingSession() {
+      if (this.visitorId) {
         try {
-          // First check if there's an existing active session for this visitor
+          // Check for existing active session for this visitor
           const existingSessionResp = await fetch(
             `${this.supabase.url}/rest/v1/chat_sessions?user_id=eq.${this.userId}&visitor_id=eq.${this.visitorId}&status=eq.active&order=created_at.desc&limit=1`, 
             {
@@ -737,50 +770,101 @@
             }
           );
           
+          if (!existingSessionResp.ok) {
+            throw new Error('Failed to check for existing session');
+          }
+          
           const existingSessions = await existingSessionResp.json();
           
           if (existingSessions && existingSessions.length > 0) {
             // Use existing session
             this.sessionId = existingSessions[0].id;
             await this.fetchMessages();
-          } else {
-            // Create new session
-            const resp = await fetch(`${this.supabase.url}/rest/v1/chat_sessions`, {
-              method: 'POST',
-              headers: {
-                'apikey': this.supabase.key,
-                'Authorization': `Bearer ${this.supabase.key}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-              },
-              body: JSON.stringify({
-                user_id: this.userId,
-                visitor_id: this.visitorId,
-                status: 'active',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                metadata: {}
-              })
-            });
             
-            const data = await resp.json();
-            this.sessionId = data[0].id;
-
-            // Only send welcome message if configured and this is a new session
-            if (this.settings.welcome_message) {
-              await this.sendBotReply(this.settings.welcome_message);
+            // If chat is open, start polling
+            if (this.isOpen) {
+              this.startMessagePolling();
             }
+            
+            return true;
           }
-          
-          this.startMessagePolling();
         } catch (error) {
-          console.error('Error creating chat session:', error);
+          console.error('Error checking for existing session:', error);
+        }
+      }
+      
+      return false;
+    }
+
+    async createChatSession() {
+      // First check if we already have a session
+      if (this.sessionId) {
+        await this.fetchMessages();
+        return;
+      }
+      
+      // Then check if there's an existing session
+      const hasExistingSession = await this.checkExistingSession();
+      if (hasExistingSession) return;
+      
+      // If no existing session, create a new one
+      try {
+        const resp = await fetch(`${this.supabase.url}/rest/v1/chat_sessions`, {
+          method: 'POST',
+          headers: {
+            'apikey': this.supabase.key,
+            'Authorization': `Bearer ${this.supabase.key}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            user_id: this.userId,
+            visitor_id: this.visitorId,
+            status: 'active',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            metadata: {}
+          })
+        });
+        
+        if (!resp.ok) {
+          throw new Error('Failed to create chat session');
+        }
+        
+        const data = await resp.json();
+        if (!data || !data[0] || !data[0].id) {
+          throw new Error('Invalid response when creating chat session');
+        }
+        
+        this.sessionId = data[0].id;
+
+        // Only send welcome message if configured and this is a new session
+        if (this.settings.welcome_message) {
+          await this.sendBotReply(this.settings.welcome_message);
+        }
+        
+        this.startMessagePolling();
+      } catch (error) {
+        console.error('Error creating chat session:', error);
+        
+        // Retry session creation after a delay
+        if (this.retryCount < this.maxRetries) {
+          this.retryCount++;
+          setTimeout(() => this.createChatSession(), 2000);
         }
       }
     }
 
     async sendMessage(text) {
-      if (!this.sessionId) await this.createChatSession();
+      if (!this.sessionId) {
+        await this.createChatSession();
+        
+        // If still no session after creation attempt, show error
+        if (!this.sessionId) {
+          console.error('Unable to create chat session');
+          return;
+        }
+      }
 
       const userMessage = { id: generateId(), sender: 'user', text, timestamp: new Date() };
       this.messages.push(userMessage);
@@ -790,31 +874,32 @@
       this.hasUserSentFirstMessage = true;
 
       try {
-        await Promise.all([
-          fetch(`${this.supabase.url}/rest/v1/chat_sessions?id=eq.${this.sessionId}`, {
-            method: 'PATCH',
-            headers: {
-              'apikey': this.supabase.key,
-              'Authorization': `Bearer ${this.supabase.key}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ updated_at: new Date().toISOString() })
-          }),
-          fetch(`${this.supabase.url}/rest/v1/chat_messages`, {
-            method: 'POST',
-            headers: {
-              'apikey': this.supabase.key,
-              'Authorization': `Bearer ${this.supabase.key}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              chat_session_id: this.sessionId,
-              sender_type: 'user',
-              message: text,
-              created_at: new Date().toISOString()
-            })
+        // First update the session's updated_at timestamp
+        await fetch(`${this.supabase.url}/rest/v1/chat_sessions?id=eq.${this.sessionId}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': this.supabase.key,
+            'Authorization': `Bearer ${this.supabase.key}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ updated_at: new Date().toISOString() })
+        });
+        
+        // Then save the message
+        await fetch(`${this.supabase.url}/rest/v1/chat_messages`, {
+          method: 'POST',
+          headers: {
+            'apikey': this.supabase.key,
+            'Authorization': `Bearer ${this.supabase.key}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            chat_session_id: this.sessionId,
+            sender_type: 'user',
+            message: text,
+            created_at: new Date().toISOString()
           })
-        ]);
+        });
       } catch (error) {
         console.error('Error saving user message:', error);
       }
@@ -885,6 +970,11 @@
     }
 
     async sendBotReply(text) {
+      if (!this.sessionId) {
+        console.error('Cannot send bot reply: No active session');
+        return;
+      }
+      
       const botMessage = { id: generateId(), sender: 'bot', text, timestamp: new Date() };
       this.messages.push(botMessage);
       this.updateChatContent();
