@@ -130,8 +130,8 @@
         border-bottom-color: #f3f4f6;
       }
       .cw-chat-bubble-agent {
-        background-color: #10b981;
-        color: white;
+        background-color: #f3f4f6;
+        color: #1f2937;
         margin-right: auto;
         border-bottom-left-radius: 0.25rem;
       }
@@ -143,8 +143,8 @@
         width: 0;
         height: 0;
         border: 8px solid transparent;
-        border-right-color: #10b981;
-        border-bottom-color: #10b981;
+        border-right-color: #f3f4f6;
+        border-bottom-color: #f3f4f6;
       }
 
       /* Chat button styles */
@@ -163,6 +163,39 @@
       }
       .cw-chat-button:active {
         transform: scale(0.95);
+      }
+      
+      /* Notification dot animation */
+      .cw-notification-dot {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 12px;
+        height: 12px;
+        background-color: #ef4444;
+        border-radius: 50%;
+        border: 2px solid white;
+      }
+      .cw-notification-dot::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: 50%;
+        background-color: #ef4444;
+        animation: cw-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+      }
+      @keyframes cw-ping {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        75%, 100% {
+          transform: scale(2);
+          opacity: 0;
+        }
       }
 
       /* Header styles */
@@ -256,6 +289,11 @@
       .cw-messages-container {
         height: 380px; /* Fixed height for messages container */
         overflow-y: auto;
+        background-color: #f9fafb;
+        background-image: 
+          radial-gradient(circle at 25px 25px, rgba(0, 0, 0, 0.01) 2%, transparent 0%), 
+          radial-gradient(circle at 75px 75px, rgba(0, 0, 0, 0.01) 2%, transparent 0%);
+        background-size: 100px 100px;
       }
       
       /* Timestamp styles */
@@ -272,6 +310,36 @@
       .cw-timestamp-bot {
         text-align: left;
         margin-left: 0.5rem;
+      }
+
+      /* Typing indicator */
+      .cw-typing-indicator {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        background-color: #f3f4f6;
+        border-radius: 1.25rem;
+        width: fit-content;
+        margin: 0.5rem 0;
+      }
+      .cw-typing-dot {
+        width: 8px;
+        height: 8px;
+        background-color: #9ca3af;
+        border-radius: 50%;
+        margin: 0 2px;
+        display: inline-block;
+        animation: cw-typing-animation 1.4s infinite ease-in-out both;
+      }
+      .cw-typing-dot:nth-child(1) {
+        animation-delay: -0.32s;
+      }
+      .cw-typing-dot:nth-child(2) {
+        animation-delay: -0.16s;
+      }
+      @keyframes cw-typing-animation {
+        0%, 80%, 100% { transform: scale(0.7); }
+        40% { transform: scale(1); }
       }
 
       /* Responsive adjustments */
@@ -317,6 +385,8 @@
       this.sessionId = null;
       this.visitorId = localStorage.getItem('chat_visitor_id') || generateId();
       this.messagePollingInterval = null;
+      this.showNotificationDot = !localStorage.getItem('chat_notification_seen');
+      this.isTyping = false;
       
       // DOM elements
       this.container = null;
@@ -379,6 +449,14 @@
       this.chatButton.innerHTML = `<span class="cw-w-6 cw-h-6 cw-text-white">${icons.messageCircle}</span>`;
       this.chatButton.setAttribute('aria-label', 'Open chat');
       this.chatButton.onclick = () => this.toggleChat();
+      
+      // Add notification dot if first time
+      if (this.showNotificationDot) {
+        const notificationDot = document.createElement('div');
+        notificationDot.className = 'cw-notification-dot';
+        this.chatButton.appendChild(notificationDot);
+      }
+      
       document.body.appendChild(this.chatButton);
 
       // Chat Window
@@ -521,7 +599,7 @@
 
           group.messages.forEach(msg => {
             const bubble = document.createElement('div');
-            bubble.className = `cw-chat-bubble ${msg.sender === 'user' ? 'cw-chat-bubble-user' : msg.sender === 'agent' ? 'cw-chat-bubble-agent' : 'cw-chat-bubble-bot'} cw-break-words cw-whitespace-pre-wrap`;
+            bubble.className = `cw-chat-bubble ${msg.sender === 'user' ? 'cw-chat-bubble-user' : 'cw-chat-bubble-bot'} cw-break-words cw-whitespace-pre-wrap`;
             bubble.innerHTML = `<div class="cw-break-words cw-whitespace-pre-wrap">${msg.text}</div>`;
             messagesEl.appendChild(bubble);
           });
@@ -534,6 +612,20 @@
           groupEl.appendChild(messagesEl);
           wrapper.appendChild(groupEl);
         });
+
+        // Add typing indicator if needed
+        if (this.isTyping) {
+          const typingEl = document.createElement('div');
+          typingEl.className = 'cw-flex cw-justify-start';
+          typingEl.innerHTML = `
+            <div class="cw-typing-indicator">
+              <div class="cw-typing-dot"></div>
+              <div class="cw-typing-dot"></div>
+              <div class="cw-typing-dot"></div>
+            </div>
+          `;
+          wrapper.appendChild(typingEl);
+        }
 
         this.messagesContainer.appendChild(wrapper);
       }
@@ -548,6 +640,17 @@
     toggleChat() {
       this.isOpen = !this.isOpen;
       this.isMinimized = false;
+      
+      // Mark notification as seen when opening chat
+      if (this.isOpen && this.showNotificationDot) {
+        this.showNotificationDot = false;
+        localStorage.setItem('chat_notification_seen', 'true');
+        const notificationDot = this.chatButton.querySelector('.cw-notification-dot');
+        if (notificationDot) {
+          notificationDot.remove();
+        }
+      }
+      
       this.updateUI();
       
       if (this.isOpen) {
@@ -671,15 +774,28 @@
       }
 
       const replyText = this.findReply(text.toLowerCase());
+      
+      // Show typing indicator
+      this.isTyping = true;
+      this.updateChatContent();
+      
       if (replyText) {
         // Add a small delay to make it feel more natural
         setTimeout(() => {
+          this.isTyping = false;
           this.sendBotReply(replyText);
-        }, 800);
+        }, 1500);
       } else if (this.settings.fallback_message) {
         setTimeout(() => {
+          this.isTyping = false;
           this.sendBotReply(this.settings.fallback_message);
-        }, 800);
+        }, 1500);
+      } else {
+        // Hide typing indicator after a delay if no response
+        setTimeout(() => {
+          this.isTyping = false;
+          this.updateChatContent();
+        }, 1500);
       }
     }
 
@@ -704,9 +820,6 @@
     }
 
     async sendBotReply(text) {
-      const delay = Math.max(500, text.length * 30); // Minimum 0.5s, 30ms per char
-      await new Promise(resolve => setTimeout(resolve, delay));
-
       const botMessage = { id: generateId(), sender: 'bot', text, timestamp: new Date() };
       this.messages.push(botMessage);
       this.updateChatContent();
