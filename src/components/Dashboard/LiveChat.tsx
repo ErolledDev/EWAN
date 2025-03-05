@@ -241,13 +241,13 @@ const LiveChat: React.FC = () => {
              label.includes(searchLower);
     })
     .sort((a, b) => {
-      // First sort by pinned status
-      if (a.metadata?.pinned && !b.metadata?.pinned) return -1;
-      if (!a.metadata?.pinned && b.metadata?.pinned) return 1;
-      
-      // Then sort by unread status
+      // First sort by unread status
       if (a.metadata?.unread && !b.metadata?.unread) return -1;
       if (!a.metadata?.unread && b.metadata?.unread) return 1;
+      
+      // Then sort by pinned status
+      if (a.metadata?.pinned && !b.metadata?.pinned) return -1;
+      if (!a.metadata?.pinned && b.metadata?.pinned) return 1;
       
       // Finally sort by updated_at
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
@@ -303,7 +303,7 @@ const LiveChat: React.FC = () => {
                   key={session.id}
                   className={`relative p-4 cursor-pointer hover:bg-gray-50 ${
                     currentSession?.id === session.id ? 'bg-indigo-50' : ''
-                  }`}
+                  } ${session.metadata?.unread ? 'bg-blue-50' : ''}`}
                   onClick={() => setCurrentSession(session.id)}
                 >
                   {/* Pinned indicator */}
@@ -314,13 +314,22 @@ const LiveChat: React.FC = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center">
-                        <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium">
+                        <div className={`h-8 w-8 rounded-full flex items-center justify-center text-gray-600 font-medium ${
+                          session.metadata?.unread ? 'bg-blue-200' : 'bg-gray-200'
+                        }`}>
                           {session.visitor_id.charAt(0).toUpperCase()}
                         </div>
                         <div className="ml-3 flex-1">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-gray-900 truncate">
+                            <p className={`text-sm font-medium ${
+                              session.metadata?.unread ? 'text-blue-900' : 'text-gray-900'
+                            } truncate`}>
                               Visitor {session.visitor_id.slice(0, 8)}
+                              {session.metadata?.unread && (
+                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  New
+                                </span>
+                              )}
                             </p>
                             <span className="text-xs text-gray-500">
                               {format(new Date(session.updated_at), 'h:mm a')}
@@ -344,18 +353,13 @@ const LiveChat: React.FC = () => {
                       
                       {/* Note preview */}
                       {session.metadata?.note && (
-                        <div className="mt-1 text-sm text-gray-500 truncate pl-11">
+                        <div className={`mt-1 text-sm truncate pl-11 ${
+                          session.metadata?.unread ? 'text-blue-800' : 'text-gray-500'
+                        }`}>
                           {session.metadata.note}
                         </div>
                       )}
                     </div>
-                    
-                    {/* Unread badge */}
-                    {session.metadata?.unread && (
-                      <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-indigo-600 rounded-full">
-                        !
-                      </span>
-                    )}
                     
                     {/* Session menu */}
                     <div className="relative ml-2">
