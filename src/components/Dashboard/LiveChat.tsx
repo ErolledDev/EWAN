@@ -275,7 +275,7 @@ const LiveChat: React.FC = () => {
     }
   };
   
-  // Filter and sort sessions
+  // Filter and sort sessions with prioritization
   const filteredSessions = activeSessions
     .filter(session => {
       const searchLower = searchTerm.toLowerCase();
@@ -313,6 +313,15 @@ const LiveChat: React.FC = () => {
     if (isMobile) {
       setShowChatOnMobile(false);
     }
+  };
+
+  // Get unread message count for a session
+  const getUnreadCount = (sessionId: string) => {
+    const sessionMessages = messages[sessionId] || [];
+    return sessionMessages.filter(msg => 
+      msg.sender_type === 'user' && 
+      new Date(msg.created_at) > new Date(sessionId === currentSession?.id ? Date.now() : (currentSession?.updated_at || 0))
+    ).length;
   };
   
   return (
@@ -362,266 +371,274 @@ const LiveChat: React.FC = () => {
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {filteredSessions.map((session) => (
-                <div
-                  key={session.id}
-                  className={`relative p-4 cursor-pointer hover:bg-gray-50 ${
-                    currentSession?.id === session.id ? 'bg-indigo-50' : ''
-                  } ${session.metadata?.unread ? 'bg-blue-50' : ''}`}
-                  onClick={() => handleSelectSession(session.id)}
-                >
-                  {/* Pinned indicator */}
-                  {session.metadata?.pinned && (
-                    <Pin className="absolute top-2 right-2 h-4 w-4 text-indigo-600" />
-                  )}
-                  
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center">
-                        <div className={`h-8 w-8 rounded-full flex items-center justify-center text-gray-600 font-medium ${
-                          session.metadata?.unread ? 'bg-blue-200' : 'bg-gray-200'
-                        }`}>
-                          {session.metadata?.visitorName 
-                            ? session.metadata.visitorName.charAt(0).toUpperCase()
-                            : session.visitor_id.charAt(0).toUpperCase()
-                          }
-                        </div>
-                        <div className="ml-3 flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className={`text-sm font-medium ${
-                              session.metadata?.unread ? 'text-blue-900' : 'text-gray-900'
-                            } truncate`}>
-                              {session.metadata?.visitorName || `Visitor ${session.visitor_id.slice(0, 8)}`}
-                              {session.metadata?.unread && (
-                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                  New
-                                </span>
-                              )}
-                            </p>
-                            <span className="text-xs text-gray-500">
-                              {format(new Date(session.updated_at), 'h:mm a')}
-                            </span>
-                          </div>
-                          
-                          {/* Label */}
-                          {session.metadata?.label && (
-                            <span
-                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1"
-                              style={{
-                                backgroundColor: `${session.metadata.label.color}15`,
-                                color: session.metadata.label.color
-                              }}
-                            >
-                              {session.metadata.label.text}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Note preview */}
-                      {session.metadata?.note && (
-                        <div className={`mt-1 text-sm truncate pl-11 ${
-                          session.metadata?.unread ? 'text-blue-800' : 'text-gray-500'
-                        }`}>
-                          {session.metadata.note}
-                        </div>
-                      )}
-                    </div>
+              {filteredSessions.map((session) => {
+                const unreadCount = getUnreadCount(session.id);
+                return (
+                  <div
+                    key={session.id}
+                    className={`relative p-4 cursor-pointer hover:bg-gray-50 ${
+                      currentSession?.id === session.id ? 'bg-indigo-50' : ''
+                    } ${session.metadata?.unread ? 'bg-blue-50' : ''}`}
+                    onClick={() => handleSelectSession(session.id)}
+                  >
+                    {/* Pinned indicator */}
+                    {session.metadata?.pinned && (
+                      <Pin className="absolute top-2 right-2 h-4 w-4 text-indigo-600" />
+                    )}
                     
-                    {/* Session menu */}
-                    <div className="relative ml-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowSessionMenu(showSessionMenu === session.id ? null : session.id);
-                        }}
-                        className="p-1 rounded-full hover:bg-gray-200"
-                      >
-                        <MoreVertical className="h-4 w-4 text-gray-500" />
-                      </button>
-                      
-                      {showSessionMenu === session.id && (
-                        <div className="absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                          <div className="py-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowVisitorNameInput(session.id);
-                                setVisitorName(session.metadata?.visitorName || '');
-                                setShowSessionMenu(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                            >
-                              <User className="h-4 w-4 mr-2" />
-                              {session.metadata?.visitorName ? 'Edit' : 'Add'} Visitor Name
-                            </button>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleTogglePin(session.id, !!session.metadata?.pinned);
-                                setShowSessionMenu(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                            >
-                              <Pin className="h-4 w-4 mr-2" />
-                              {session.metadata?.pinned ? 'Unpin' : 'Pin'} Chat
-                            </button>
-                            
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowLabelMenu(session.id);
-                                setShowSessionMenu(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                            >
-                              <Tag className="h-4 w-4 mr-2" />
-                              {session.metadata?.label ? 'Change' : 'Add'} Label
-                            </button>
-                            
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowNoteInput(session.id);
-                                setNoteText(session.metadata?.note || '');
-                                setShowSessionMenu(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                            >
-                              <MessageCircle className="h-4 w-4 mr-2" />
-                              {session.metadata?.note ? 'Edit' : 'Add'} Note
-                            </button>
-                            
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCloseSession(session.id);
-                                setShowSessionMenu(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
-                            >
-                              <X className="h-4 w-4 mr-2" />
-                              Close Chat
-                            </button>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center">
+                          <div className={`relative h-8 w-8 rounded-full flex items-center justify-center text-gray-600 font-medium ${
+                            session.metadata?.unread ? 'bg-blue-200' : 'bg-gray-200'
+                          }`}>
+                            {session.metadata?.visitorName 
+                              ? session.metadata.visitorName.charAt(0).toUpperCase()
+                              : session.visitor_id.charAt(0).toUpperCase()
+                            }
+                            {unreadCount > 0 && (
+                              <span className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center bg-red-500 text-white text-xs font-bold rounded-full">
+                                {unreadCount}
+                              </span>
+                            )}
                           </div>
-                        </div>
-                      )}
-                      
-                      {/* Label menu */}
-                      {showLabelMenu === session.id && (
-                        <div className="absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                          <div className="py-1">
-                            {labels.map((label) => (
-                              <button
-                                key={label.text}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAddLabel(session.id, label);
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
-                                style={{ color: label.color }}
-                              >
-                                <span
-                                  className="h-3 w-3 rounded-full mr-2"
-                                  style={{ backgroundColor: label.color }}
-                                />
-                                {label.text}
-                              </button>
-                            ))}
+                          <div className="ml-3 flex-1">
+                            <div className="flex items-center justify-between">
+                              <p className={`text-sm font-medium ${
+                                session.metadata?.unread ? 'text-blue-900' : 'text-gray-900'
+                              } truncate`}>
+                                {session.metadata?.visitorName || `Visitor ${session.visitor_id.slice(0, 8)}`}
+                                {session.metadata?.unread && !unreadCount && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    New
+                                  </span>
+                                )}
+                              </p>
+                              <span className="text-xs text-gray-500">
+                                {format(new Date(session.updated_at), 'h:mm a')}
+                              </span>
+                            </div>
                             
+                            {/* Label */}
                             {session.metadata?.label && (
-                              <>
-                                <div className="border-t border-gray-200 my-1" />
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveLabel(session.id);
-                                    setShowLabelMenu(null);
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
-                                >
-                                  <X className="h-4 w-4 mr-2" />
-                                  Remove Label
-                                </button>
-                              </>
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1"
+                                style={{
+                                  backgroundColor: `${session.metadata.label.color}15`,
+                                  color: session.metadata.label.color
+                                }}
+                              >
+                                {session.metadata.label.text}
+                              </span>
                             )}
                           </div>
                         </div>
-                      )}
+                        
+                        {/* Note preview */}
+                        {session.metadata?.note && (
+                          <div className={`mt-1 text-sm truncate pl-11 ${
+                            session.metadata?.unread ? 'text-blue-800' : 'text-gray-500'
+                          }`}>
+                            {session.metadata.note}
+                          </div>
+                        )}
+                      </div>
                       
-                      {/* Note input */}
-                      {showNoteInput === session.id && (
-                        <div className="absolute right-0 mt-1 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 p-3">
-                          <textarea
-                            value={noteText}
-                            onChange={(e) => setNoteText(e.target.value)}
-                            placeholder="Add a note..."
-                            className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                          <div className="flex justify-end mt-2 space-x-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowNoteInput(null);
-                                setNoteText('');
-                              }}
-                              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUpdateNote(session.id);
-                              }}
-                              className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                            >
-                              Save
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      {/* Session menu */}
+                      <div className="relative ml-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowSessionMenu(showSessionMenu === session.id ? null : session.id);
+                          }}
+                          className="p-1 rounded-full hover:bg-gray-200"
+                        >
+                          <MoreVertical className="h-4 w-4 text-gray-500" />
+                        </button>
+                        
+                        {showSessionMenu === session.id && (
+                          <div className="absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                            <div className="py-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowVisitorNameInput(session.id);
+                                  setVisitorName(session.metadata?.visitorName || '');
+                                  setShowSessionMenu(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                              >
+                                <User className="h-4 w-4 mr-2" />
+                                {session.metadata?.visitorName ? 'Edit' : 'Add'} Visitor Name
+                              </button>
 
-                      {/* Visitor name input */}
-                      {showVisitorNameInput === session.id && (
-                        <div className="absolute right-0 mt-1 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 p-3">
-                          <input
-                            type="text"
-                            value={visitorName}
-                            onChange={(e) => setVisitorName(e.target.value)}
-                            placeholder="Enter visitor name..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                          <div className="flex justify-end mt-2 space-x-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowVisitorNameInput(null);
-                                setVisitorName('');
-                              }}
-                              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUpdateVisitorName(session.id);
-                              }}
-                              className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                            >
-                              Save
-                            </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTogglePin(session.id, !!session.metadata?.pinned);
+                                  setShowSessionMenu(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                              >
+                                <Pin className="h-4 w-4 mr-2" />
+                                {session.metadata?.pinned ? 'Unpin' : 'Pin'} Chat
+                              </button>
+                              
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowLabelMenu(session.id);
+                                  setShowSessionMenu(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                              >
+                                <Tag className="h-4 w-4 mr-2" />
+                                {session.metadata?.label ? 'Change' : 'Add'} Label
+                              </button>
+                              
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowNoteInput(session.id);
+                                  setNoteText(session.metadata?.note || '');
+                                  setShowSessionMenu(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                              >
+                                <MessageCircle className="h-4 w-4 mr-2" />
+                                {session.metadata?.note ? 'Edit' : 'Add'} Note
+                              </button>
+                              
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCloseSession(session.id);
+                                  setShowSessionMenu(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Close Chat
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                        
+                        {/* Label menu */}
+                        {showLabelMenu === session.id && (
+                          <div className="absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                            <div className="py-1">
+                              {labels.map((label) => (
+                                <button
+                                  key={label.text}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddLabel(session.id, label);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
+                                  style={{ color: label.color }}
+                                >
+                                  <span
+                                    className="h-3 w-3 rounded-full mr-2"
+                                    style={{ backgroundColor: label.color }}
+                                  />
+                                  {label.text}
+                                </button>
+                              ))}
+                              
+                              {session.metadata?.label && (
+                                <>
+                                  <div className="border-t border-gray-200 my-1" />
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveLabel(session.id);
+                                      setShowLabelMenu(null);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                                  >
+                                    <X className="h-4 w-4 mr-2" />
+                                    Remove Label
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Note input */}
+                        {showNoteInput === session.id && (
+                          <div className="absolute right-0 mt-1 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 p-3">
+                            <textarea
+                              value={noteText}
+                              onChange={(e) => setNoteText(e.target.value)}
+                              placeholder="Add a note..."
+                              className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div className="flex justify-end mt-2 space-x-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowNoteInput(null);
+                                  setNoteText('');
+                                }}
+                                className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUpdateNote(session.id);
+                                }}
+                                className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Visitor name input */}
+                        {showVisitorNameInput === session.id && (
+                          <div className="absolute right-0 mt-1 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 p-3">
+                            <input
+                              type="text"
+                              value={visitorName}
+                              onChange={(e) => setVisitorName(e.target.value)}
+                              placeholder="Enter visitor name..."
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div className="flex justify-end mt-2 space-x-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowVisitorNameInput(null);
+                                  setVisitorName('');
+                                }}
+                                className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUpdateVisitorName(session.id);
+                                }}
+                                className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
