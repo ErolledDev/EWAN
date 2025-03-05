@@ -40,7 +40,7 @@ export const useChatStore = create<ChatState>()(
             .select('*')
             .eq('user_id', userId)
             .eq('status', 'active')
-            .order('updated_at', { ascending: false });
+            .order('created_at', { ascending: false });
           
           if (error) throw error;
           
@@ -48,16 +48,16 @@ export const useChatStore = create<ChatState>()(
           const currentSessions = get().activeSessions;
           const newSessions = data as ChatSession[];
           
-          // Mark sessions as unread if they have been updated
+          // Mark sessions as unread if they have new messages
           const updatedSessions = newSessions.map(newSession => {
             const existingSession = currentSessions.find(s => s.id === newSession.id);
             
-            // If session exists and has been updated
+            // If session exists and has new messages
             if (existingSession) {
               const newUpdateTime = new Date(newSession.updated_at).getTime();
               const oldUpdateTime = new Date(existingSession.updated_at).getTime();
               
-              // If the session has been updated and it's not the current session
+              // If there are new messages and it's not the current session
               if (newUpdateTime > oldUpdateTime && 
                   (!get().currentSession || get().currentSession.id !== newSession.id)) {
                 return {
@@ -73,17 +73,27 @@ export const useChatStore = create<ChatState>()(
             return newSession;
           });
           
-          set({ activeSessions: updatedSessions });
+          // Sort sessions: pinned first, then by creation date
+          const sortedSessions = [...updatedSessions].sort((a, b) => {
+            // First sort by pinned status
+            if (a.metadata?.pinned && !b.metadata?.pinned) return -1;
+            if (!a.metadata?.pinned && b.metadata?.pinned) return 1;
+            
+            // Then sort by creation date (newest first)
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          });
+          
+          set({ activeSessions: sortedSessions });
           
           // If we have a current session, make sure it's still in the active sessions
           const currentSession = get().currentSession;
           if (currentSession) {
-            const stillActive = updatedSessions.some(session => session.id === currentSession.id);
+            const stillActive = sortedSessions.some(session => session.id === currentSession.id);
             if (!stillActive) {
               set({ currentSession: null });
             } else {
               // Update the current session with the latest data
-              const updatedSession = updatedSessions.find(session => session.id === currentSession.id);
+              const updatedSession = sortedSessions.find(session => session.id === currentSession.id);
               if (updatedSession) {
                 set({ currentSession: updatedSession });
               }
@@ -91,7 +101,7 @@ export const useChatStore = create<ChatState>()(
           }
 
           // Set up real-time subscriptions for all active sessions
-          updatedSessions.forEach(session => {
+          sortedSessions.forEach(session => {
             // Subscribe to messages for this session
             supabase
               .channel(`messages:${session.id}`)
@@ -122,7 +132,6 @@ export const useChatStore = create<ChatState>()(
               )
               .subscribe();
           });
-
         } catch (error) {
           console.error('Error fetching chat sessions:', error);
         }
@@ -169,6 +178,10 @@ export const useChatStore = create<ChatState>()(
         
         const session = get().activeSessions.find(s => s.id === sessionId);
         if (session) {
+          // Mark session as read when selected
+          if (session.metadata?.unread) {
+            get().markSessionAsRead(sessionId);
+          }
           set({ currentSession: session });
         }
       },
@@ -321,6 +334,7 @@ export const useChatStore = create<ChatState>()(
             .from('chat_sessions')
             .update({
               metadata: restMetadata,
+              updated_at: new Date().toISOString(),
             })
             .eq('id', sessionId);
           
@@ -344,20 +358,23 @@ export const useChatStore = create<ChatState>()(
               } 
             });
           }
-          
-          return;
         } catch (error) {
           console.error('Error marking session as read:', error);
-          throw error;
         }
       },
 
-      // New methods for real-time updates
       updateSession: (session: ChatSession) => {
         set({
           activeSessions: get().activeSessions.map(s => 
             s.id === session.id ? session : s
-          ).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+          ).sort((a, b) => {
+            // Keep pinned chats at the top
+            if (a.metadata?.pinned && !b.metadata?.pinned) return -1;
+            if (!a.metadata?.pinned && b.metadata?.pinned) return 1;
+            
+            // Sort by creation date
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          })
         });
       },
 
