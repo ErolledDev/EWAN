@@ -30,11 +30,6 @@ const LucideIcon = ({
         <path d="m22 2-7 20-4-9-9-4Z"/>
         <path d="M22 2 11 13"/>
       </svg>
-    ),
-    ChevronDown: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-        <path d="m6 9 6 6 6-6"/>
-      </svg>
     )
   };
 
@@ -59,6 +54,26 @@ type MessageGroup = {
   messages: Message[];
 };
 
+// Helper function to group messages
+const groupMessages = (messages: Message[]): MessageGroup[] => {
+  const groups: MessageGroup[] = [];
+  let currentGroup: MessageGroup | null = null;
+
+  messages.forEach((message) => {
+    if (!currentGroup || currentGroup.sender !== message.sender) {
+      currentGroup = {
+        sender: message.sender,
+        messages: [message]
+      };
+      groups.push(currentGroup);
+    } else {
+      currentGroup.messages.push(message);
+    }
+  });
+
+  return groups;
+};
+
 const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
@@ -71,7 +86,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [hasUserSentFirstMessage, setHasUserSentFirstMessage] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const messagesStartRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Create Supabase client
   const supabase = createClient(
@@ -79,49 +94,163 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inphd2hkcHJvcmx3YWFnbW15eWVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5MzU1NTEsImV4cCI6MjA1NjUxMTU1MX0.HaHu907PQHPxSWNQrUsP6gNOpRaN08PnSZF-pN-BaD8'
   );
 
-  // Scroll to top when new messages arrive
+  // Scroll to bottom when new messages arrive
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   useEffect(() => {
-    if (messagesStartRef.current) {
-      messagesStartRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    scrollToBottom();
   }, [messages]);
 
-  // Update unread count when widget is not open
+  // Update unread count and handle new messages
   useEffect(() => {
-    if (!isOpen && messages.some(m => m.isNew)) {
-      const newCount = messages.filter(m => m.isNew).length;
-      setUnreadCount(newCount);
+    if (!isOpen) {
+      const newMessages = messages.filter(m => m.isNew);
+      setUnreadCount(newMessages.length);
     } else {
+      // Mark all messages as read when chat is opened
+      setMessages(prevMessages => 
+        prevMessages.map(msg => ({
+          ...msg,
+          isNew: false
+        }))
+      );
       setUnreadCount(0);
-      // Mark all messages as read when widget is opened
-      setMessages(messages.map(m => ({ ...m, isNew: false })));
     }
   }, [isOpen, messages]);
 
-  // Rest of your existing useEffect hooks...
-  // [Previous code for fetching widget data, initializing chat session, etc.]
+  // Initialize chat
+  useEffect(() => {
+    const initChat = async () => {
+      try {
+        // Fetch widget settings
+        const { data: settingsData } = await supabase
+          .from('widget_settings')
+          .select('*')
+          .eq('user_id', uid)
+          .single();
+        
+        if (settingsData) {
+          setSettings(settingsData);
+        }
+
+        // Generate or retrieve visitor ID
+        const storedVisitorId = localStorage.getItem('chat_visitor_id');
+        const newVisitorId = storedVisitorId || nanoid();
+        if (!storedVisitorId) {
+          localStorage.setItem('chat_visitor_id', newVisitorId);
+        }
+        setVisitorId(newVisitorId);
+
+        // Fetch existing session if any
+        const { data: sessionData } = await supabase
+          .from('chat_sessions')
+          .select('*')
+          .eq('visitor_id', newVisitorId)
+          .eq('status', 'active')
+          .single();
+
+        if (sessionData) {
+          setSessionId(sessionData.id);
+          // Fetch existing messages
+          const { data: messagesData } = await supabase
+            .from('chat_messages')
+            .select('*')
+            .eq('chat_session_id', sessionData.id)
+            .order('created_at', { ascending: false });
+
+          if (messagesData) {
+            setMessages(messagesData.map(msg => ({
+              id: msg.id,
+              sender: msg.sender_type,
+              text: msg.message,
+              timestamp: new Date(msg.created_at),
+              isNew: false
+            })));
+          }
+        }
+
+        // Fetch auto replies and advanced replies
+        const { data: autoRepliesData } = await supabase
+          .from('auto_replies')
+          .select('*')
+          .eq('user_id', uid);
+        
+        const { data: advancedRepliesData } = await supabase
+          .from('advanced_replies')
+          .select('*')
+          .eq('user_id', uid);
+
+        if (autoRepliesData) setAutoReplies(autoRepliesData);
+        if (advancedRepliesData) setAdvancedReplies(advancedRepliesData);
+
+      } catch (error) {
+        console.error('Error initializing chat:', error);
+      }
+    };
+
+    initChat();
+  }, [uid]);
+
+  const createSession = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .insert({
+          user_id: uid,
+          visitor_id: visitorId,
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setSessionId(data.id);
+        // Send welcome message if configured
+        if (settings?.welcome_message) {
+          await sendMessage(settings.welcome_message, 'bot');
+        }
+      }
+    } catch (error) {
+      console.error('Error creating session:', error);
+    }
+  };
+
+  const toggleChat = () => {
+    setIsOpen(!isOpen);
+  };
 
   const sendMessage = async (text: string, sender: 'user' | 'bot' | 'agent') => {
+    if (!sessionId && sender === 'user') {
+      await createSession();
+    }
+
     const newMessage: Message = {
       id: nanoid(),
       sender,
       text,
       timestamp: new Date(),
-      isNew: !isOpen // Mark as new if widget is closed
+      isNew: !isOpen
     };
 
     // Add message to the beginning of the array
-    setMessages(prev => [newMessage, ...prev]);
+    setMessages(prevMessages => [newMessage, ...prevMessages]);
 
     try {
-      await supabase
-        .from('chat_messages')
-        .insert({
-          chat_session_id: sessionId,
-          sender_type: sender,
-          message: text,
-          created_at: new Date().toISOString(),
-        });
+      if (sessionId) {
+        await supabase
+          .from('chat_messages')
+          .insert({
+            chat_session_id: sessionId,
+            sender_type: sender,
+            message: text,
+            created_at: new Date().toISOString()
+          });
+      }
     } catch (error) {
       console.error('Error saving message:', error);
     }
@@ -130,24 +259,63 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!message.trim() || !sessionId) return;
+    if (!message.trim()) return;
+    
+    const userMessage = message.trim();
+    setMessage('');
     
     // Send user message
-    await sendMessage(message, 'user');
-    setHasUserSentFirstMessage(true);
-    setMessage('');
+    await sendMessage(userMessage, 'user');
+    
+    if (!hasUserSentFirstMessage) {
+      setHasUserSentFirstMessage(true);
+    }
     
     // Show typing indicator
     setIsTyping(true);
     
-    // Process the message to find a reply
-    const userMessageLower = message.toLowerCase();
+    // Find matching reply
+    const messageLower = userMessage.toLowerCase();
     let replied = false;
     
-    // Check auto replies and advanced replies...
-    // [Previous code for handling replies]
-
-    // If no reply matched, send fallback message
+    // Check auto replies
+    for (const reply of autoReplies) {
+      if (reply.keywords.some((keyword: string) => 
+        messageLower.includes(keyword.toLowerCase())
+      )) {
+        setTimeout(() => {
+          sendMessage(reply.response, 'bot');
+          setIsTyping(false);
+        }, 1000);
+        replied = true;
+        break;
+      }
+    }
+    
+    // Check advanced replies if no auto reply matched
+    if (!replied) {
+      for (const reply of advancedReplies) {
+        if (reply.keywords.some((keyword: string) => 
+          messageLower.includes(keyword.toLowerCase())
+        )) {
+          setTimeout(() => {
+            if (reply.response_type === 'url') {
+              sendMessage(
+                `<a href="${reply.response}" target="_blank" class="text-blue-600 hover:underline">${reply.button_text || 'Click here'}</a>`,
+                'bot'
+              );
+            } else {
+              sendMessage(reply.response, 'bot');
+            }
+            setIsTyping(false);
+          }, 1000);
+          replied = true;
+          break;
+        }
+      }
+    }
+    
+    // Send fallback message if no reply matched
     if (!replied && settings?.fallback_message) {
       setTimeout(() => {
         sendMessage(settings.fallback_message, 'bot');
@@ -160,9 +328,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
     }
   };
 
-  if (!settings) {
-    return null;
-  }
+  if (!settings) return null;
 
   const messageGroups = groupMessages(messages);
 
@@ -187,10 +353,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
           </>
         )}
       </button>
-      
+
       {/* Chat window */}
       {isOpen && (
-        <div className="bg-white rounded-lg shadow-xl w-80 sm:w-96 mt-4 flex flex-col overflow-hidden max-h-[80vh] animate-fade-in">
+        <div className="bg-white rounded-lg shadow-xl w-80 sm:w-96 mt-4 flex flex-col overflow-hidden max-h-[80vh]">
           {/* Header */}
           <div 
             className="p-4 flex justify-between items-center"
@@ -204,7 +370,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
               </div>
               <div>
                 <h3 className="text-white font-medium text-lg">{settings.business_name || 'Chat'}</h3>
-                <p className="text-sm text-white opacity-90">
+                <p className="text-sm text-white opacity-70">
                   {settings.sales_representative || 'Support'} | Online
                 </p>
               </div>
@@ -216,9 +382,9 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
               <LucideIcon icon="X" className="w-5 h-5" />
             </button>
           </div>
-          
+
           {/* Messages */}
-          <div className="flex-1 p-4 overflow-y-auto max-h-[50vh]">
+          <div className="flex-1 p-4 overflow-y-auto">
             {messages.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
                 <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
@@ -228,69 +394,59 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
                 <p className="text-sm">Send a message to get started</p>
               </div>
             ) : (
-              <div className="space-y-6">
-                <div ref={messagesStartRef} />
+              <div className="space-y-4">
                 {messageGroups.map((group, groupIndex) => (
                   <div key={groupIndex} className={`flex ${group.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div className="flex flex-col">
-                      {/* Only show sender name once per group for bot/agent messages */}
-                      {group.sender !== 'user' && (
-                        <span className="text-xs font-medium text-gray-600 ml-2 mb-1">
-                          {settings.sales_representative || 'Support'}
-                        </span>
-                      )}
-                      
-                      {/* Messages in this group */}
-                      <div className="space-y-1">
-                        {group.messages.map((msg, msgIndex) => (
-                          <div
-                            key={msg.id}
-                            className={`relative max-w-[80%] rounded-lg px-4 py-2 ${
-                              msg.sender === 'user'
-                                ? 'bg-blue-100 text-blue-800 ml-auto'
-                                : msg.sender === 'agent'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {msg.isNew && (
-                              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                New
-                              </span>
-                            )}
-                            {msg.sender === 'bot' ? (
-                              <div dangerouslySetInnerHTML={{ __html: msg.text }} />
-                            ) : (
-                              <div>{msg.text}</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      
-                      {/* Timestamp outside the bubble, only once per group */}
-                      <div className={`text-xs text-gray-500 mt-1 ${group.sender === 'user' ? 'text-right mr-1' : 'text-left ml-1'}`}>
+                      {group.messages.map((msg, msgIndex) => (
+                        <div
+                          key={msg.id}
+                          className={`relative max-w-[80%] rounded-lg px-4 py-2 ${
+                            msg.sender === 'user'
+                              ? 'bg-blue-100 text-blue-800 ml-auto'
+                              : msg.sender === 'agent'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {msg.isNew && (
+                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                              New
+                            </span>
+                          )}
+                          {msg.sender === 'bot' ? (
+                            <div dangerouslySetInnerHTML={{ __html: msg.text }} />
+                          ) : (
+                            <div>{msg.text}</div>
+                          )}
+                        </div>
+                      ))}
+                      <div className={`text-xs text-gray-500 mt-1 ${
+                        group.sender === 'user' ? 'text-right' : 'text-left'
+                      }`}>
                         {format(group.messages[group.messages.length - 1].timestamp, 'h:mm a')}
                       </div>
                     </div>
                   </div>
                 ))}
-                
-                {/* Typing indicator */}
-                {isTyping && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-100 rounded-full px-3 py-2">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                    </div>
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+            
+            {/* Typing indicator */}
+            {isTyping && (
+              <div className="flex justify-start mt-2">
+                <div className="bg-gray-100 rounded-full px-4 py-2">
+                  <div className="flex space-x-2">
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                )}
+                </div>
               </div>
             )}
           </div>
-          
+
           {/* Input */}
           <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200">
             <div className="flex relative">
@@ -299,11 +455,11 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Type your message..."
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-l-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 pr-12"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
               />
               <button
                 type="submit"
-                className="absolute right-0 top-1/2 transform -translate-y-1/2 px-4 py-2 rounded-r-md focus:outline-none mr-1"
+                className="px-4 py-2 rounded-r-md focus:outline-none"
                 style={{ backgroundColor: settings.primary_color || '#4f46e5' }}
               >
                 <LucideIcon icon="Send" className="w-5 h-5 text-white" />
