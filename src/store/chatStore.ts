@@ -21,6 +21,8 @@ interface ChatState {
   closeSession: (sessionId: string) => Promise<void>;
   updateSessionMetadata: (sessionId: string, metadata: Record<string, any>) => Promise<void>;
   markSessionAsRead: (sessionId: string) => Promise<void>;
+  updateSession: (session: ChatSession) => void;
+  addMessage: (sessionId: string, message: ChatMessage) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -29,7 +31,7 @@ export const useChatStore = create<ChatState>()(
       activeSessions: [],
       currentSession: null,
       messages: {},
-      agentMode: true, // Set default to true
+      agentMode: true,
       
       fetchSessions: async (userId: string) => {
         try {
@@ -46,7 +48,7 @@ export const useChatStore = create<ChatState>()(
           const currentSessions = get().activeSessions;
           const newSessions = data as ChatSession[];
           
-          // Mark sessions as unread if they have been updated since last fetch
+          // Mark sessions as unread if they have been updated
           const updatedSessions = newSessions.map(newSession => {
             const existingSession = currentSessions.find(s => s.id === newSession.id);
             
@@ -87,6 +89,40 @@ export const useChatStore = create<ChatState>()(
               }
             }
           }
+
+          // Set up real-time subscriptions for all active sessions
+          updatedSessions.forEach(session => {
+            // Subscribe to messages for this session
+            supabase
+              .channel(`messages:${session.id}`)
+              .on(
+                'postgres_changes',
+                {
+                  event: 'INSERT',
+                  schema: 'public',
+                  table: 'chat_messages',
+                  filter: `chat_session_id=eq.${session.id}`
+                },
+                (payload) => {
+                  const newMessage = payload.new as ChatMessage;
+                  get().addMessage(session.id, newMessage);
+                  
+                  // If this is not the current session, mark it as unread
+                  if (!get().currentSession || get().currentSession.id !== session.id) {
+                    get().updateSession({
+                      ...session,
+                      updated_at: new Date().toISOString(),
+                      metadata: {
+                        ...session.metadata,
+                        unread: true
+                      }
+                    });
+                  }
+                }
+              )
+              .subscribe();
+          });
+
         } catch (error) {
           console.error('Error fetching chat sessions:', error);
         }
@@ -314,6 +350,25 @@ export const useChatStore = create<ChatState>()(
           console.error('Error marking session as read:', error);
           throw error;
         }
+      },
+
+      // New methods for real-time updates
+      updateSession: (session: ChatSession) => {
+        set({
+          activeSessions: get().activeSessions.map(s => 
+            s.id === session.id ? session : s
+          ).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+        });
+      },
+
+      addMessage: (sessionId: string, message: ChatMessage) => {
+        const currentMessages = get().messages[sessionId] || [];
+        set({
+          messages: {
+            ...get().messages,
+            [sessionId]: [...currentMessages, message]
+          }
+        });
       }
     }),
     {
@@ -326,3 +381,5 @@ export const useChatStore = create<ChatState>()(
     }
   )
 );
+
+export default useChatStore;
