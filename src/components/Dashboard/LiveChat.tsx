@@ -373,33 +373,29 @@ const LiveChat: React.FC = () => {
                     <Pin className="absolute top-2 right-2 h-4 w-4 text-indigo-600" />
                   )}
                   
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center">
-                        <div className={`relative h-8 w-8 rounded-full flex items-center justify-center ${
-                          session.metadata?.unread ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'
-                        } font-medium`}>
-                          {session.metadata?.visitorName 
-                            ? session.metadata.visitorName.charAt(0).toUpperCase()
-                            : session.visitor_id.charAt(0).toUpperCase()
-                          }
-                        </div>
-                        <div className="ml-3 flex-1">
-                          <p className={`text-sm font-medium ${
-                            session.metadata?.unread ? 'text-blue-900' : 'text-gray-900'
-                          } truncate`}>
-                            {session.metadata?.visitorName || `Visitor ${session.visitor_id.slice(0, 8)}`}
-                          </p>
-                          
-                          {session.latest_message && (
-                            <p className={`mt-1 text-sm line-clamp-2 ${
-                              session.metadata?.unread ? 'font-semibold text-gray-900' : 'text-gray-500'
-                            }`}>
-                              {session.latest_message.message}
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                  <div className="flex items-start">
+                    <div className={`relative h-10 w-10 rounded-full flex items-center justify-center ${
+                      session.metadata?.unread ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                    } font-medium`}>
+                      {session.metadata?.visitorName 
+                        ? session.metadata.visitorName.charAt(0).toUpperCase()
+                        : session.visitor_id.charAt(0).toUpperCase()
+                      }
+                    </div>
+                    <div className="ml-3 flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${
+                        session.metadata?.unread ? 'text-blue-900' : 'text-gray-900'
+                      } truncate`}>
+                        {session.metadata?.visitorName || `Visitor ${session.visitor_id.slice(0, 8)}`}
+                      </p>
+                      
+                      {session.latest_message && (
+                        <p className={`mt-1 text-sm truncate ${
+                          session.metadata?.unread ? 'text-gray-900' : 'text-gray-500'
+                        }`}>
+                          {session.latest_message.message}
+                        </p>
+                      )}
                       
                       {session.metadata?.label && (
                         <span
@@ -411,200 +407,6 @@ const LiveChat: React.FC = () => {
                         >
                           {session.metadata.label.text}
                         </span>
-                      )}
-                      
-                      {session.metadata?.note && (
-                        <div className="mt-1 text-sm truncate text-gray-500">
-                          {session.metadata.note}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="relative ml-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowSessionMenu(showSessionMenu === session.id ? null : session.id);
-                        }}
-                        className="p-1 rounded-full hover:bg-gray-200"
-                      >
-                        <MoreVertical className="h-4 w-4 text-gray-500" />
-                      </button>
-                      
-                      {showSessionMenu === session.id && (
-                        <div className="absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                          <div className="py-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowVisitorNameInput(session.id);
-                                setVisitorName(session.metadata?.visitorName || '');
-                                setShowSessionMenu(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                            >
-                              <User className="h-4 w-4 mr-2" />
-                              {session.metadata?.visitorName ? 'Edit' : 'Add'} Visitor Name
-                            </button>
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleTogglePin(session.id, !!session.metadata?.pinned);
-                                setShowSessionMenu(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                            >
-                              <Pin className="h-4 w-4 mr-2" />
-                              {session.metadata?.pinned ? 'Unpin' : 'Pin'} Chat
-                            </button>
-                            
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowLabelMenu(session.id);
-                                setShowSessionMenu(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                            >
-                              <Tag className="h-4 w-4 mr-2" />
-                              {session.metadata?.label ? 'Change' : 'Add'} Label
-                            </button>
-                            
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowNoteInput(session.id);
-                                setNoteText(session.metadata?.note || '');
-                                setShowSessionMenu(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                            >
-                              <MessageCircle className="h-4 w-4 mr-2" />
-                              {session.metadata?.note ? 'Edit' : 'Add'} Note
-                            </button>
-                            
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCloseSession(session.id);
-                                setShowSessionMenu(null);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
-                            >
-                              <X className="h-4 w-4 mr-2" />
-                              Close Chat
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {showLabelMenu === session.id && (
-                        <div className="absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                          <div className="py-1">
-                            {labels.map((label) => (
-                              <button
-                                key={label.text}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAddLabel(session.id, label);
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
-                                style={{ color: label.color }}
-                              >
-                                <span
-                                  className="h-3 w-3 rounded-full mr-2"
-                                  style={{ backgroundColor: label.color }}
-                                />
-                                {label.text}
-                              </button>
-                            ))}
-                            
-                            {session.metadata?.label && (
-                              <>
-                                <div className="border-t border-gray-200 my-1" />
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveLabel(session.id);
-                                    setShowLabelMenu(null);
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
-                                >
-                                  <X className="h-4 w-4 mr-2" />
-                                  Remove Label
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {showNoteInput === session.id && (
-                        <div className="absolute right-0 mt-1 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 p-3">
-                          <textarea
-                            value={noteText}
-                            onChange={(e) => setNoteText(e.target.value)}
-                            placeholder="Add a note..."
-                            className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                          <div className="flex justify-end mt-2 space-x-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowNoteInput(null);
-                                setNoteText('');
-                              }}
-                              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUpdateNote(session.id);
-                              }}
-                              className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                            >
-                              Save
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {showVisitorNameInput === session.id && (
-                        <div className="absolute right-0 mt-1 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 p-3">
-                          <input
-                            type="text"
-                            value={visitorName}
-                            onChange={(e) => setVisitorName(e.target.value)}
-                            placeholder="Enter visitor name..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                          <div className="flex justify-end mt-2 space-x-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowVisitorNameInput(null);
-                                setVisitorName('');
-                              }}
-                              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUpdateVisitorName(session.id);
-                              }}
-                              className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                            >
-                              Save
-                            </button>
-                          </div>
-                        </div>
                       )}
                     </div>
                   </div>
@@ -649,16 +451,145 @@ const LiveChat: React.FC = () => {
                   </div>
                 </div>
                 
-                {currentSession.metadata?.label && (
-                  <span
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
-                    style={{
-                      backgroundColor: `${currentSession.metadata.label.color}15`,
-                      color: currentSession.metadata.label.color
-                    }}
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleTogglePin(currentSession.id, !!currentSession.metadata?.pinned)}
+                    className={`p-2 rounded-md hover:bg-gray-100 ${
+                      currentSession.metadata?.pinned ? 'text-indigo-600' : 'text-gray-500'
+                    }`}
                   >
-                    {currentSession.metadata.label.text}
-                  </span>
+                    <Pin className="h-5 w-5" />
+                  </button>
+                  
+                  <button
+                    onClick={() => setShowLabelMenu(currentSession.id)}
+                    className={`p-2 rounded-md hover:bg-gray-100 ${
+                      currentSession.metadata?.label ? 'text-indigo-600' : 'text-gray-500'
+                    }`}
+                  >
+                    <Tag className="h-5 w-5" />
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setShowVisitorNameInput(currentSession.id);
+                      setVisitorName(currentSession.metadata?.visitorName || '');
+                    }}
+                    className="p-2 rounded-md hover:bg-gray-100 text-gray-500"
+                  >
+                    <User className="h-5 w-5" />
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setShowNoteInput(currentSession.id);
+                      setNoteText(currentSession.metadata?.note || '');
+                    }}
+                    className="p-2 rounded-md hover:bg-gray-100 text-gray-500"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                  </button>
+                  
+                  <button
+                    onClick={() => handleCloseSession(currentSession.id)}
+                    className="p-2 rounded-md hover:bg-gray-100 text-red-500"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                
+                {showLabelMenu === currentSession.id && (
+                  <div className="absolute right-4 mt-12 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                    <div className="py-1">
+                      {labels.map((label) => (
+                        <button
+                          key={label.text}
+                          onClick={() => handleAddLabel(currentSession.id, label)}
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
+                          style={{ color: label.color }}
+                        >
+                          <span
+                            className="h-3 w-3 rounded-full mr-2"
+                            style={{ backgroundColor: label.color }}
+                          />
+                          {label.text}
+                        </button>
+                      ))}
+                      
+                      {currentSession.metadata?.label && (
+                        <>
+                          <div className="border-t border-gray-200 my-1" />
+                          <button
+                            onClick={() => {
+                              handleRemoveLabel(currentSession.id);
+                              setShowLabelMenu(null);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Remove Label
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {showNoteInput === currentSession.id && (
+                  <div className="absolute right-4 mt-12 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 p-3">
+                    <textarea
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      placeholder="Add a note..."
+                      className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                    />
+                    <div className="flex justify-end mt-2 space-x-2">
+                      <button
+                        onClick={() => {
+                          setShowNoteInput(null);
+                          setNoteText('');
+                        }}
+                        className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleUpdateNote(currentSession.id)}
+                        className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {showVisitorNameInput === currentSession.id && (
+                  <div className="absolute right-4 mt-12 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 p-3">
+                    <input
+                      type="text"
+                      value={visitorName}
+                      onChange={(e) => setVisitorName(e.target.value)}
+                      placeholder="Enter visitor name..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                    />
+                    <div className="flex justify-end mt-2 space-x-2">
+                      <button
+                        onClick={() => {
+                          setShowVisitorNameInput(null);
+                          setVisitorName('');
+                        }}
+                        className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleUpdateVisitorName(currentSession.id)}
+                        className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
               
@@ -699,10 +630,12 @@ const LiveChat: React.FC = () => {
                         className={`max-w-[70%] rounded-lg px-4 py-2 ${
                           message.sender_type === 'user'
                             ? 'bg-white text-gray-900'
-                            : 'bg-indigo-600 text-white'
+                            : message.sender_type === 'agent'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.message}</p>
+                        <div className="text-sm truncate">{message.message}</div>
                         <p className="text-xs mt-1 opacity-75">
                           {format(new Date(message.created_at), 'h:mm a')}
                         </p>
@@ -731,7 +664,7 @@ const LiveChat: React.FC = () => {
                 >
                   {isSubmitting ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www. 4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
