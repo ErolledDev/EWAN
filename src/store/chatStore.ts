@@ -35,29 +35,36 @@ export const useChatStore = create<ChatState>()(
       
       fetchSessions: async (userId: string) => {
         try {
-          const { data, error } = await supabase
+          // First get all active sessions
+          const { data: sessions, error: sessionsError } = await supabase
             .from('chat_sessions')
-            .select('*, chat_messages!inner(*)')
+            .select('*')
             .eq('user_id', userId)
-            .eq('status', 'active')
-            .order('chat_messages.created_at', { ascending: false })
-            .limit(1, { foreignTable: 'chat_messages' });
+            .eq('status', 'active');
           
-          if (error) throw error;
+          if (sessionsError) throw sessionsError;
           
-          // Process sessions and their latest messages
-          const processedSessions = data?.map(session => {
-            const latestMessage = session.chat_messages?.[0];
+          // Then get the latest message for each session
+          const processedSessions = await Promise.all(sessions.map(async (session) => {
+            const { data: messages, error: messagesError } = await supabase
+              .from('chat_messages')
+              .select('*')
+              .eq('chat_session_id', session.id)
+              .order('created_at', { ascending: false })
+              .limit(1);
+            
+            if (messagesError) throw messagesError;
+            
+            const latestMessage = messages?.[0];
             return {
               ...session,
-              chat_messages: undefined, // Remove nested messages
               latest_message: latestMessage ? {
                 message: latestMessage.message,
                 created_at: latestMessage.created_at,
                 sender_type: latestMessage.sender_type
               } : null
             };
-          }) || [];
+          }));
 
           // Sort sessions: pinned first, then by latest message date
           const sortedSessions = processedSessions.sort((a, b) => {
