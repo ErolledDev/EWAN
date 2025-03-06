@@ -37,72 +37,55 @@ export const useChatStore = create<ChatState>()(
         try {
           const { data, error } = await supabase
             .from('chat_sessions')
-            .select('*')
+            .select('*, chat_messages!inner(*)')
             .eq('user_id', userId)
             .eq('status', 'active')
-            .order('created_at', { ascending: false });
+            .order('chat_messages.created_at', { ascending: false })
+            .limit(1, { foreignTable: 'chat_messages' });
           
           if (error) throw error;
           
-          // Check for new messages since last fetch
-          const currentSessions = get().activeSessions;
-          const newSessions = data as ChatSession[];
-          
-          // Mark sessions as unread if they have new messages
-          const updatedSessions = newSessions.map(newSession => {
-            const existingSession = currentSessions.find(s => s.id === newSession.id);
-            
-            // If session exists and has new messages
-            if (existingSession) {
-              const newUpdateTime = new Date(newSession.updated_at).getTime();
-              const oldUpdateTime = new Date(existingSession.updated_at).getTime();
-              
-              // If there are new messages and it's not the current session
-              if (newUpdateTime > oldUpdateTime && 
-                  (!get().currentSession || get().currentSession.id !== newSession.id)) {
-                return {
-                  ...newSession,
-                  metadata: {
-                    ...newSession.metadata,
-                    unread: true
-                  }
-                };
-              }
-            }
-            
-            return newSession;
-          });
-          
-          // Sort sessions: pinned first, then by creation date
-          const sortedSessions = [...updatedSessions].sort((a, b) => {
+          // Process sessions and their latest messages
+          const processedSessions = data?.map(session => {
+            const latestMessage = session.chat_messages?.[0];
+            return {
+              ...session,
+              chat_messages: undefined, // Remove nested messages
+              latest_message: latestMessage ? {
+                message: latestMessage.message,
+                created_at: latestMessage.created_at,
+                sender_type: latestMessage.sender_type
+              } : null
+            };
+          }) || [];
+
+          // Sort sessions: pinned first, then by latest message date
+          const sortedSessions = processedSessions.sort((a, b) => {
             // First sort by pinned status
             if (a.metadata?.pinned && !b.metadata?.pinned) return -1;
             if (!a.metadata?.pinned && b.metadata?.pinned) return 1;
             
-            // Then sort by creation date (newest first)
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            // Then sort by latest message date
+            const aDate = a.latest_message?.created_at || a.updated_at;
+            const bDate = b.latest_message?.created_at || b.updated_at;
+            return new Date(bDate).getTime() - new Date(aDate).getTime();
           });
           
           set({ activeSessions: sortedSessions });
           
-          // If we have a current session, make sure it's still in the active sessions
+          // Update current session if needed
           const currentSession = get().currentSession;
           if (currentSession) {
-            const stillActive = sortedSessions.some(session => session.id === currentSession.id);
-            if (!stillActive) {
-              set({ currentSession: null });
+            const updatedSession = sortedSessions.find(s => s.id === currentSession.id);
+            if (updatedSession) {
+              set({ currentSession: updatedSession });
             } else {
-              // Update the current session with the latest data
-              const updatedSession = sortedSessions.find(session => session.id === currentSession.id);
-              if (updatedSession) {
-                set({ currentSession: updatedSession });
-              }
+              set({ currentSession: null });
             }
           }
 
-          // Set up real-time subscriptions for all active sessions
+          // Set up real-time subscriptions
           sortedSessions.forEach(session => {
-            // Subscribe to messages for this session
             supabase
               .channel(`messages:${session.id}`)
               .on(
@@ -113,25 +96,51 @@ export const useChatStore = create<ChatState>()(
                   table: 'chat_messages',
                   filter: `chat_session_id=eq.${session.id}`
                 },
-                (payload) => {
+                async (payload) => {
                   const newMessage = payload.new as ChatMessage;
                   get().addMessage(session.id, newMessage);
                   
+                  // Update session's latest message
+                  const updatedSession = {
+                    ...session,
+                    latest_message: {
+                      message: newMessage.message,
+                      created_at: newMessage.created_at,
+                      sender_type: newMessage.sender_type
+                    }
+                  };
+                  
                   // If this is not the current session, mark it as unread
                   if (!get().currentSession || get().currentSession.id !== session.id) {
-                    get().updateSession({
-                      ...session,
-                      updated_at: new Date().toISOString(),
-                      metadata: {
-                        ...session.metadata,
-                        unread: true
-                      }
-                    });
+                    updatedSession.metadata = {
+                      ...updatedSession.metadata,
+                      unread: true
+                    };
                   }
+                  
+                  get().updateSession(updatedSession);
                 }
               )
               .subscribe();
           });
+
+          // Subscribe to new sessions
+          supabase
+            .channel('new_sessions')
+            .on(
+              'postgres_changes',
+              {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'chat_sessions',
+                filter: `user_id=eq.${userId} AND status=eq.active`
+              },
+              () => {
+                // Refetch sessions when a new one is created
+                get().fetchSessions(userId);
+              }
+            )
+            .subscribe();
         } catch (error) {
           console.error('Error fetching chat sessions:', error);
         }
@@ -158,7 +167,7 @@ export const useChatStore = create<ChatState>()(
           
           const newSession = data as ChatSession;
           set({ 
-            activeSessions: [...get().activeSessions, newSession],
+            activeSessions: [newSession, ...get().activeSessions],
             currentSession: newSession,
             messages: { ...get().messages, [newSession.id]: [] }
           });
@@ -241,6 +250,19 @@ export const useChatStore = create<ChatState>()(
             }
           });
           
+          // Update session's latest message
+          const session = get().activeSessions.find(s => s.id === sessionId);
+          if (session) {
+            get().updateSession({
+              ...session,
+              latest_message: {
+                message: newMessage.message,
+                created_at: newMessage.created_at,
+                sender_type: newMessage.sender_type
+              }
+            });
+          }
+          
           return;
         } catch (error) {
           console.error('Error sending message:', error);
@@ -267,7 +289,10 @@ export const useChatStore = create<ChatState>()(
           
           // Remove the session from active sessions
           set({
-            activeSessions: get().activeSessions.filter(session => session.id !== sessionId)
+            activeSessions: get().activeSessions.filter(session => session.id !== sessionId),
+            messages: Object.fromEntries(
+              Object.entries(get().messages).filter(([key]) => key !== sessionId)
+            )
           });
           
           // If this was the current session, clear it
@@ -296,23 +321,20 @@ export const useChatStore = create<ChatState>()(
           if (error) throw error;
           
           // Update the session in the local state
-          set({
-            activeSessions: get().activeSessions.map(session => 
-              session.id === sessionId 
-                ? { ...session, metadata, updated_at: new Date().toISOString() } 
-                : session
-            )
-          });
-          
-          // If this is the current session, update it too
-          if (get().currentSession?.id === sessionId) {
-            set({ 
-              currentSession: { 
-                ...get().currentSession!, 
-                metadata,
-                updated_at: new Date().toISOString()
-              } 
-            });
+          const session = get().activeSessions.find(s => s.id === sessionId);
+          if (session) {
+            const updatedSession = {
+              ...session,
+              metadata,
+              updated_at: new Date().toISOString()
+            };
+            
+            get().updateSession(updatedSession);
+            
+            // If this is the current session, update it too
+            if (get().currentSession?.id === sessionId) {
+              set({ currentSession: updatedSession });
+            }
           }
           
           return;
@@ -341,22 +363,16 @@ export const useChatStore = create<ChatState>()(
           if (error) throw error;
           
           // Update the session in the local state
-          set({
-            activeSessions: get().activeSessions.map(session => 
-              session.id === sessionId 
-                ? { ...session, metadata: restMetadata } 
-                : session
-            )
-          });
+          const updatedSession = {
+            ...session,
+            metadata: restMetadata
+          };
+          
+          get().updateSession(updatedSession);
           
           // If this is the current session, update it too
           if (get().currentSession?.id === sessionId) {
-            set({ 
-              currentSession: { 
-                ...get().currentSession!, 
-                metadata: restMetadata
-              } 
-            });
+            set({ currentSession: updatedSession });
           }
         } catch (error) {
           console.error('Error marking session as read:', error);
@@ -372,8 +388,10 @@ export const useChatStore = create<ChatState>()(
             if (a.metadata?.pinned && !b.metadata?.pinned) return -1;
             if (!a.metadata?.pinned && b.metadata?.pinned) return 1;
             
-            // Sort by creation date
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            // Sort by latest message date
+            const aDate = a.latest_message?.created_at || a.updated_at;
+            const bDate = b.latest_message?.created_at || b.updated_at;
+            return new Date(bDate).getTime() - new Date(aDate).getTime();
           })
         });
       },
@@ -386,6 +404,19 @@ export const useChatStore = create<ChatState>()(
             [sessionId]: [...currentMessages, message]
           }
         });
+        
+        // Update session's latest message
+        const session = get().activeSessions.find(s => s.id === sessionId);
+        if (session) {
+          get().updateSession({
+            ...session,
+            latest_message: {
+              message: message.message,
+              created_at: message.created_at,
+              sender_type: message.sender_type
+            }
+          });
+        }
       }
     }),
     {

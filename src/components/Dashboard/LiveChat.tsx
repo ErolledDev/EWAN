@@ -295,8 +295,10 @@ const LiveChat: React.FC = () => {
       if (a.metadata?.pinned && !b.metadata?.pinned) return -1;
       if (!a.metadata?.pinned && b.metadata?.pinned) return 1;
       
-      // Finally sort by updated_at
-      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      // Finally sort by latest message date
+      const aDate = a.latest_message?.created_at || a.updated_at;
+      const bDate = b.latest_message?.created_at || b.updated_at;
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
     });
 
   const handleSelectSession = (sessionId: string) => {
@@ -310,12 +312,6 @@ const LiveChat: React.FC = () => {
     if (isMobile) {
       setShowChatOnMobile(false);
     }
-  };
-
-  // Get the latest message for a session
-  const getLatestMessage = (sessionId: string) => {
-    const sessionMessages = messages[sessionId] || [];
-    return sessionMessages[sessionMessages.length - 1]?.message || '';
   };
 
   return (
@@ -395,11 +391,13 @@ const LiveChat: React.FC = () => {
                             {session.metadata?.visitorName || `Visitor ${session.visitor_id.slice(0, 8)}`}
                           </p>
                           
-                          <p className={`mt-1 text-sm truncate ${
-                            session.metadata?.unread ? 'font-semibold text-gray-900' : 'text-gray-500'
-                          }`}>
-                            {getLatestMessage(session.id)}
-                          </p>
+                          {session.latest_message && (
+                            <p className={`mt-1 text-sm line-clamp-2 ${
+                              session.metadata?.unread ? 'font-semibold text-gray-900' : 'text-gray-500'
+                            }`}>
+                              {session.latest_message.message}
+                            </p>
+                          )}
                         </div>
                       </div>
                       
@@ -733,7 +731,7 @@ const LiveChat: React.FC = () => {
                 >
                   {isSubmitting ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www. 4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
@@ -746,7 +744,8 @@ const LiveChat: React.FC = () => {
                     </>
                   )}
                 </button>
-              </form> </div>
+              </form>
+            </div>
           </>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
