@@ -20,7 +20,8 @@ const LiveChat: React.FC = () => {
     toggleAgentMode,
     closeSession,
     updateSessionMetadata,
-    markSessionAsRead
+    markSessionAsRead,
+    markMessageAsRead
   } = useChatStore();
   const { addNotification } = useNotificationStore();
   
@@ -77,8 +78,16 @@ const LiveChat: React.FC = () => {
       if (currentSession.metadata?.unread) {
         markSessionAsRead(currentSession.id);
       }
+      
+      // Mark all messages as read when session is selected
+      const sessionMessages = messages[currentSession.id] || [];
+      sessionMessages.forEach(message => {
+        if (message.metadata?.unread) {
+          markMessageAsRead(currentSession.id, message.id);
+        }
+      });
     }
-  }, [currentSession, fetchMessages, markSessionAsRead]);
+  }, [currentSession, fetchMessages, markSessionAsRead, markMessageAsRead, messages]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -381,6 +390,9 @@ const LiveChat: React.FC = () => {
                         ? session.metadata.visitorName.charAt(0).toUpperCase()
                         : session.visitor_id.charAt(0).toUpperCase()
                       }
+                      {session.metadata?.unread && (
+                        <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full border-2 border-white"></span>
+                      )}
                     </div>
                     <div className="ml-3 flex-1 min-w-0">
                       <p className={`text-sm font-medium ${
@@ -391,7 +403,7 @@ const LiveChat: React.FC = () => {
                       
                       {session.latest_message && (
                         <p className={`mt-1 text-sm truncate ${
-                          session.metadata?.unread ? 'text-gray-900' : 'text-gray-500'
+                          session.metadata?.unread ? 'text-gray-900 font-semibold' : 'text-gray-500'
                         }`}>
                           {session.latest_message.message}
                         </p>
@@ -633,9 +645,14 @@ const LiveChat: React.FC = () => {
                             : message.sender_type === 'agent'
                             ? 'bg-indigo-600 text-white'
                             : 'bg-gray-100 text-gray-800'
-                        }`}
+                        } relative`}
                       >
-                        <div className="text-sm truncate">{message.message}</div>
+                        {message.metadata?.unread && (
+                          <span className="absolute -top-2 -right-2 h-3 w-3 bg-red-500 rounded-full border-2 border-white"></span>
+                        )}
+                        <div className={`text-sm ${message.metadata?.unread ? 'font-semibold' : ''}`}>
+                          {message.message}
+                        </div>
                         <p className="text-xs mt-1 opacity-75">
                           {format(new Date(message.created_at), 'h:mm a')}
                         </p>

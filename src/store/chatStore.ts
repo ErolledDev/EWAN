@@ -23,6 +23,7 @@ interface ChatState {
   markSessionAsRead: (sessionId: string) => Promise<void>;
   updateSession: (session: ChatSession) => void;
   addMessage: (sessionId: string, message: ChatMessage) => void;
+  markMessageAsRead: (sessionId: string, messageId: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -405,10 +406,21 @@ export const useChatStore = create<ChatState>()(
 
       addMessage: (sessionId: string, message: ChatMessage) => {
         const currentMessages = get().messages[sessionId] || [];
+        const currentSession = get().currentSession;
+        
+        // Add unread metadata if the message is new and not from current session
+        const messageWithMetadata = {
+          ...message,
+          metadata: {
+            ...message.metadata,
+            unread: !currentSession || currentSession.id !== sessionId
+          }
+        };
+        
         set({
           messages: {
             ...get().messages,
-            [sessionId]: [...currentMessages, message]
+            [sessionId]: [...currentMessages, messageWithMetadata]
           }
         });
         
@@ -423,6 +435,35 @@ export const useChatStore = create<ChatState>()(
               sender_type: message.sender_type
             }
           });
+        }
+      },
+
+      markMessageAsRead: async (sessionId: string, messageId: string) => {
+        try {
+          const messages = get().messages[sessionId] || [];
+          const updatedMessages = messages.map(msg => 
+            msg.id === messageId 
+              ? { ...msg, metadata: { ...msg.metadata, unread: false } }
+              : msg
+          );
+          
+          set({
+            messages: {
+              ...get().messages,
+              [sessionId]: updatedMessages
+            }
+          });
+          
+          // Update message metadata in database
+          await supabase
+            .from('chat_messages')
+            .update({
+              metadata: { unread: false }
+            })
+            .eq('id', messageId);
+            
+        } catch (error) {
+          console.error('Error marking message as read:', error);
         }
       }
     }),

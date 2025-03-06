@@ -48,6 +48,10 @@ export interface ChatMessage {
   sender_type: 'user' | 'bot' | 'agent';
   message: string;
   created_at: string;
+  metadata?: {
+    unread?: boolean;
+    [key: string]: any;
+  };
 }
 
 export interface ChatSession {
