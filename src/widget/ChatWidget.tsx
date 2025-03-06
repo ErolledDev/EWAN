@@ -46,6 +46,7 @@ type Message = {
   text: string;
   timestamp: Date;
   isNew?: boolean;
+  isRead?: boolean;
 };
 
 // Group messages by sender for better display
@@ -59,7 +60,12 @@ const groupMessages = (messages: Message[]): MessageGroup[] => {
   const groups: MessageGroup[] = [];
   let currentGroup: MessageGroup | null = null;
 
-  messages.forEach((message) => {
+  // Sort messages by timestamp in ascending order
+  const sortedMessages = [...messages].sort((a, b) => 
+    a.timestamp.getTime() - b.timestamp.getTime()
+  );
+
+  sortedMessages.forEach((message) => {
     if (!currentGroup || currentGroup.sender !== message.sender) {
       currentGroup = {
         sender: message.sender,
@@ -106,14 +112,15 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
   // Update unread count and handle new messages
   useEffect(() => {
     if (!isOpen) {
-      const newMessages = messages.filter(m => m.isNew);
+      const newMessages = messages.filter(m => m.isNew || !m.isRead);
       setUnreadCount(newMessages.length);
     } else {
       // Mark all messages as read when chat is opened
       setMessages(prevMessages => 
         prevMessages.map(msg => ({
           ...msg,
-          isNew: false
+          isNew: false,
+          isRead: true
         }))
       );
       setUnreadCount(0);
@@ -158,7 +165,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
             .from('chat_messages')
             .select('*')
             .eq('chat_session_id', sessionData.id)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: true });
 
           if (messagesData) {
             setMessages(messagesData.map(msg => ({
@@ -166,7 +173,8 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
               sender: msg.sender_type,
               text: msg.message,
               timestamp: new Date(msg.created_at),
-              isNew: false
+              isNew: false,
+              isRead: true
             })));
           }
         }
@@ -185,13 +193,43 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
         if (autoRepliesData) setAutoReplies(autoRepliesData);
         if (advancedRepliesData) setAdvancedReplies(advancedRepliesData);
 
+        // Set up real-time subscription for new messages
+        if (sessionData?.id) {
+          const subscription = supabase
+            .channel(`messages:${sessionData.id}`)
+            .on(
+              'postgres_changes',
+              {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'chat_messages',
+                filter: `chat_session_id=eq.${sessionData.id}`
+              },
+              (payload) => {
+                const newMessage = {
+                  id: payload.new.id,
+                  sender: payload.new.sender_type,
+                  text: payload.new.message,
+                  timestamp: new Date(payload.new.created_at),
+                  isNew: !isOpen, // Mark as new if chat is closed
+                  isRead: isOpen // Mark as read if chat is open
+                };
+                setMessages(prev => [...prev, newMessage]);
+              }
+            )
+            .subscribe();
+
+          return () => {
+            subscription.unsubscribe();
+          };
+        }
       } catch (error) {
         console.error('Error initializing chat:', error);
       }
     };
 
     initChat();
-  }, [uid]);
+  }, [uid, isOpen]);
 
   const createSession = async () => {
     try {
@@ -234,11 +272,12 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
       sender,
       text,
       timestamp: new Date(),
-      isNew: !isOpen
+      isNew: !isOpen, // Mark as new if chat is closed
+      isRead: isOpen // Mark as read if chat is open
     };
 
-    // Add message to the beginning of the array
-    setMessages(prevMessages => [newMessage, ...prevMessages]);
+    // Add message to the array
+    setMessages(prevMessages => [...prevMessages, newMessage]);
 
     try {
       if (sessionId) {
@@ -346,7 +385,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
           <>
             <LucideIcon icon="MessageCircle" className="w-6 h-6 text-white" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
                 {unreadCount}
               </span>
             )}
@@ -407,18 +446,20 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
                               : msg.sender === 'agent'
                               ? 'bg-green-100 text-green-800'
                               : 'bg-gray-100 text-gray-800'
-                          }`}
+                          } ${msgIndex > 0 ? 'mt-1' : ''}`}
                         >
+                          {/* New message indicator */}
                           {msg.isNew && (
-                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                              New
-                            </span>
+                            <span className="absolute -top-2 -right-2 h-3 w-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
                           )}
-                          {msg.sender === 'bot' ? (
-                            <div dangerouslySetInnerHTML={{ __html: msg.text }} />
-                          ) : (
-                            <div>{msg.text}</div>
-                          )}
+                          {/* Message content with bold text for unread messages */}
+                          <div className={`${(!msg.isRead || msg.isNew) ? 'font-semibold' : 'font-normal'}`}>
+                            {msg.sender === 'bot' ? (
+                              <div dangerouslySetInnerHTML={{ __html: msg.text }} />
+                            ) : (
+                              <div>{msg.text}</div>
+                            )}
+                          </div>
                         </div>
                       ))}
                       <div className={`text-xs text-gray-500 mt-1 ${
