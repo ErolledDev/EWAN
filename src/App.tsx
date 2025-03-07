@@ -7,7 +7,6 @@ import WidgetSettings from './components/Dashboard/WidgetSettings';
 import AutoReply from './components/Dashboard/AutoReply';
 import AdvancedReply from './components/Dashboard/AdvancedReply';
 import AiMode from './components/Dashboard/AiMode';
-import LiveChat from './components/Dashboard/LiveChat';
 import NotificationContainer from './components/ui/NotificationContainer';
 import { useNotificationStore } from './store/notificationStore';
 import { Helmet } from 'react-helmet-async';
@@ -72,7 +71,6 @@ function App() {
           <Route path="auto-reply" element={<AutoReply />} />
           <Route path="advanced-reply" element={<AdvancedReply />} />
           <Route path="ai-mode" element={<AiMode />} />
-          <Route path="live-chat" element={<LiveChat />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageCircle } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import LoginForm from '../components/Auth/LoginForm';
 import { useAuthStore } from '../store/authStore';
 import { Helmet } from 'react-helmet-async';
@@ -20,7 +20,7 @@ const HomePage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <Helmet>
         <title>ChatWidget - Engage with your visitors in real-time</title>
-        <meta name="description" content="Add a powerful chat widget to your website with auto-replies, advanced responses, AI-powered conversations, and live agent support." />
+        <meta name="description" content="Add a powerful chat widget to your website with auto-replies, advanced responses, and AI-powered conversations." />
       </Helmet>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -28,7 +28,7 @@ const HomePage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div>
               <div className="flex items-center text-indigo-600 mb-4">
-                <MessageCircle className="h-8 w-8 mr-2" />
+                <MessageSquare className="h-8 w-8 mr-2" />
                 <h1 className="text-3xl font-bold">ChatWidget</h1>
               </div>
               
@@ -37,7 +37,7 @@ const HomePage: React.FC = () => {
               </h2>
               
               <p className="mt-5 text-xl text-gray-500">
-                Add a powerful chat widget to your website with auto-replies, advanced responses, AI-powered conversations, and live agent support.
+                Add a powerful chat widget to your website with auto-replies, advanced responses, and AI-powered conversations.
               </p>
               
               <div className="mt-8 space-y-4">
@@ -73,17 +73,6 @@ const HomePage: React.FC = () => {
                     <strong className="font-medium text-gray-900">AI Mode</strong> - Let AI handle complex queries with context about your business
                   </p>
                 </div>
-                
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <p className="ml-3 text-base text-gray-500">
-                    <strong className="font-medium text-gray-900">Live Chat</strong> - Jump in and chat directly with your visitors when needed
-                  </p>
-                </div>
               </div>
             </div>
             
@@ -99,7 +88,7 @@ const HomePage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="md:flex md:items-center md:justify-between">
             <div className="flex items-center">
-              <MessageCircle className="h-6 w-6 text-indigo-600 mr-2" />
+              <MessageSquare className="h-6 w-6 text-indigo-600 mr-2" />
               <span className="text-gray-900 font-medium">ChatWidget</span>
             </div>
             <div className="mt-4 md:mt-0">
