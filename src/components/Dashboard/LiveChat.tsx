@@ -7,7 +7,91 @@ import { MessageCircle, Send, Search, X, Pin, Tag, AlertCircle, ChevronDown, Mor
 import { Helmet } from 'react-helmet-async';
 
 const LiveChat: React.FC = () => {
-  // ... existing state and hooks ...
+  const [isMobile, setIsMobile] = useState(false);
+  const [showChatOnMobile, setShowChatOnMobile] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [agentMode, setAgentMode] = useState(true);
+
+  const { user } = useAuthStore();
+  const { 
+    activeSessions, 
+    currentSession,
+    messages,
+    fetchSessions,
+    setCurrentSession,
+    sendMessage,
+    fetchMessages 
+  } = useChatStore();
+  const { addNotification } = useNotificationStore();
+
+  // Check for mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Fetch sessions when component mounts
+  useEffect(() => {
+    if (user) {
+      fetchSessions(user.id);
+    }
+  }, [user, fetchSessions]);
+
+  // Filter sessions based on search term
+  const filteredSessions = activeSessions.filter(session => {
+    const searchLower = searchTerm.toLowerCase();
+    const visitorName = session.metadata?.visitorName || `Visitor ${session.visitor_id.slice(0, 8)}`;
+    const latestMessage = session.latest_message?.message || '';
+    
+    return visitorName.toLowerCase().includes(searchLower) ||
+           latestMessage.toLowerCase().includes(searchLower);
+  });
+
+  const handleSelectSession = async (sessionId: string) => {
+    setCurrentSession(sessionId);
+    if (isMobile) {
+      setShowChatOnMobile(true);
+    }
+    await fetchMessages(sessionId);
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!messageText.trim() || !currentSession || !agentMode || isSubmitting) return;
+    
+    setIsSubmitting(true);
+    setIsTyping(true);
+    
+    try {
+      await sendMessage(currentSession.id, messageText.trim(), 'agent');
+      setMessageText('');
+      addNotification({
+        type: 'success',
+        title: 'Message sent successfully',
+        duration: 2000
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      addNotification({
+        type: 'error',
+        title: 'Failed to send message',
+        message: 'Please try again',
+        duration: 3000
+      });
+    } finally {
+      setIsSubmitting(false);
+      setIsTyping(false);
+    }
+  };
 
   return (
     <div className="h-[calc(100vh-4rem)] flex">
@@ -20,7 +104,18 @@ const LiveChat: React.FC = () => {
       <div className={`${
         isMobile && showChatOnMobile ? 'hidden' : 'block'
       } w-full md:w-80 border-r border-gray-200 bg-white flex flex-col`}>
-        {/* ... existing sessions list header ... */}
+        <div className="p-4 border-b border-gray-200">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search conversations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
         
         <div className="flex-1 overflow-y-auto">
           {filteredSessions.length === 0 ? (
@@ -96,7 +191,54 @@ const LiveChat: React.FC = () => {
       } flex-1 flex flex-col bg-gray-50`}>
         {currentSession ? (
           <>
-            {/* ... existing chat header ... */}
+            {/* Chat Header */}
+            <div className="bg-white border-b border-gray-200 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  {isMobile && (
+                    <button
+                      onClick={() => setShowChatOnMobile(false)}
+                      className="mr-2 text-gray-500 hover:text-gray-600"
+                    >
+                      <ChevronDown className="h-5 w-5" />
+                    </button>
+                  )}
+                  <div className="flex items-center">
+                    <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-medium">
+                      {currentSession.metadata?.visitorName 
+                        ? currentSession.metadata.visitorName.charAt(0).toUpperCase()
+                        : currentSession.visitor_id.charAt(0).toUpperCase()
+                      }
+                    </div>
+                    <div className="ml-3">
+                      <h2 className="text-sm font-medium text-gray-900">
+                        {currentSession.metadata?.visitorName || `Visitor ${currentSession.visitor_id.slice(0, 8)}`}
+                      </h2>
+                      <p className="text-xs text-gray-500">
+                        {format(new Date(currentSession.created_at), 'MMM d, yyyy h:mm a')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setAgentMode(!agentMode)}
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      agentMode 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {agentMode ? 'Agent Mode: On' : 'Agent Mode: Off'}
+                  </button>
+                  
+                  <button className="text-gray-400 hover:text-gray-500">
+                    <MoreVertical className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
             
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4">
@@ -108,7 +250,7 @@ const LiveChat: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {messages[currentSession.id]?.map((message, msgIndex) => (
+                  {messages[currentSession.id]?.map((message) => (
                     <div
                       key={message.id}
                       className={`flex ${
@@ -121,7 +263,7 @@ const LiveChat: React.FC = () => {
                           : message.sender_type === 'agent'
                           ? 'bg-indigo-600 text-white'
                           : 'bg-gray-100 text-gray-800'
-                      } ${msgIndex > 0 ? 'mt-1' : ''}`}>
+                      }`}>
                         {message.metadata?.unread && (
                           <span className="absolute -top-2 -right-2 h-3 w-3 bg-red-500 rounded-full border-2 border-white"></span>
                         )}
