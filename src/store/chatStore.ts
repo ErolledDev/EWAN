@@ -1,8 +1,46 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import { ChatMessage, ChatSession } from '../types';
 import { nanoid } from 'nanoid';
 import { persist, createJSONStorage } from 'zustand/middleware';
+
+// Update the ChatMessage interface to include metadata for tracking read status
+interface ChatMessage {
+  id: string;
+  chat_session_id: string;
+  sender_type: 'user' | 'bot' | 'agent';
+  message: string;
+  created_at: string;
+  metadata?: {
+    unread?: boolean;
+    [key: string]: any;
+  };
+}
+
+// Update the ChatSession interface to include unread status in metadata
+interface ChatSession {
+  id: string;
+  user_id: string;
+  visitor_id: string;
+  status: 'active' | 'closed';
+  created_at: string;
+  updated_at: string;
+  latest_message?: {
+    message: string;
+    created_at: string;
+    sender_type: 'user' | 'bot' | 'agent';
+  };
+  metadata?: {
+    visitorName?: string;
+    pinned?: boolean;
+    note?: string;
+    unread?: boolean;
+    label?: {
+      text: string;
+      color: string;
+    };
+    [key: string]: any;
+  };
+}
 
 interface ChatState {
   activeSessions: ChatSession[];
@@ -199,6 +237,15 @@ export const useChatStore = create<ChatState>()(
           if (session.metadata?.unread) {
             get().markSessionAsRead(sessionId);
           }
+          
+          // Mark all messages as read when session is selected
+          const sessionMessages = get().messages[sessionId] || [];
+          sessionMessages.forEach(message => {
+            if (message.metadata?.unread) {
+              get().markMessageAsRead(sessionId, message.id);
+            }
+          });
+          
           set({ currentSession: session });
         }
       },
@@ -376,7 +423,11 @@ export const useChatStore = create<ChatState>()(
             metadata: restMetadata
           };
           
-          get().updateSession(updatedSession);
+          set({
+            activeSessions: get().activeSessions.map(s => 
+              s.id === sessionId ? updatedSession : s
+            )
+          });
           
           // If this is the current session, update it too
           if (get().currentSession?.id === sessionId) {
@@ -396,7 +447,11 @@ export const useChatStore = create<ChatState>()(
             if (a.metadata?.pinned && !b.metadata?.pinned) return -1;
             if (!a.metadata?.pinned && b.metadata?.pinned) return 1;
             
-            // Sort by latest message date
+            // Then sort by unread status
+            if (a.metadata?.unread && !b.metadata?.unread) return -1;
+            if (!a.metadata?.unread && b.metadata?.unread) return 1;
+            
+            // Finally sort by latest message date
             const aDate = a.latest_message?.created_at || a.updated_at;
             const bDate = b.latest_message?.created_at || b.updated_at;
             return new Date(bDate).getTime() - new Date(aDate).getTime();
@@ -424,16 +479,39 @@ export const useChatStore = create<ChatState>()(
           }
         });
         
-        // Update session's latest message
+        // Update session's latest message and unread status
         const session = get().activeSessions.find(s => s.id === sessionId);
         if (session) {
-          get().updateSession({
+          const updatedSession = {
             ...session,
             latest_message: {
               message: message.message,
               created_at: message.created_at,
               sender_type: message.sender_type
+            },
+            metadata: {
+              ...session.metadata,
+              unread: !currentSession || currentSession.id !== sessionId
             }
+          };
+          
+          set({
+            activeSessions: get().activeSessions.map(s => 
+              s.id === sessionId ? updatedSession : s
+            ).sort((a, b) => {
+              // Keep pinned chats at the top
+              if (a.metadata?.pinned && !b.metadata?.pinned) return -1;
+              if (!a.metadata?.pinned && b.metadata?.pinned) return 1;
+              
+              // Then sort by unread status
+              if (a.metadata?.unread && !b.metadata?.unread) return -1;
+              if (!a.metadata?.unread && b.metadata?.unread) return 1;
+              
+              // Finally sort by latest message date
+              const aDate = a.latest_message?.created_at || a.updated_at;
+              const bDate = b.latest_message?.created_at || b.updated_at;
+              return new Date(bDate).getTime() - new Date(aDate).getTime();
+            })
           });
         }
       },

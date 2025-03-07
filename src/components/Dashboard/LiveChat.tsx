@@ -7,321 +7,7 @@ import { MessageCircle, Send, Search, X, Pin, Tag, AlertCircle, ChevronDown, Mor
 import { Helmet } from 'react-helmet-async';
 
 const LiveChat: React.FC = () => {
-  const { user } = useAuthStore();
-  const { 
-    activeSessions,
-    currentSession,
-    messages,
-    agentMode,
-    fetchSessions,
-    fetchMessages,
-    sendMessage,
-    setCurrentSession,
-    toggleAgentMode,
-    closeSession,
-    updateSessionMetadata,
-    markSessionAsRead,
-    markMessageAsRead
-  } = useChatStore();
-  const { addNotification } = useNotificationStore();
-  
-  const [messageText, setMessageText] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSessionMenu, setShowSessionMenu] = useState<string | null>(null);
-  const [showLabelMenu, setShowLabelMenu] = useState<string | null>(null);
-  const [noteText, setNoteText] = useState('');
-  const [showNoteInput, setShowNoteInput] = useState<string | null>(null);
-  const [showVisitorNameInput, setShowVisitorNameInput] = useState<string | null>(null);
-  const [visitorName, setVisitorName] = useState('');
-  const [isMobile, setIsMobile] = useState(false);
-  const [showChatOnMobile, setShowChatOnMobile] = useState(false);
-  
-  // Predefined labels
-  const labels = [
-    { text: 'Important', color: '#ef4444' },
-    { text: 'Follow Up', color: '#f59e0b' },
-    { text: 'Resolved', color: '#10b981' },
-    { text: 'Pending', color: '#6366f1' },
-    { text: 'Support', color: '#8b5cf6' },
-    { text: 'Sales', color: '#ec4899' },
-  ];
-
-  useEffect(() => {
-    const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth >= 768) {
-        setShowChatOnMobile(false);
-      }
-    };
-
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      fetchSessions(user.id);
-      
-      const interval = setInterval(() => {
-        fetchSessions(user.id);
-      }, 5000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [user, fetchSessions]);
-  
-  useEffect(() => {
-    if (currentSession) {
-      fetchMessages(currentSession.id);
-      if (currentSession.metadata?.unread) {
-        markSessionAsRead(currentSession.id);
-      }
-      
-      // Mark all messages as read when session is selected
-      const sessionMessages = messages[currentSession.id] || [];
-      sessionMessages.forEach(message => {
-        if (message.metadata?.unread) {
-          markMessageAsRead(currentSession.id, message.id);
-        }
-      });
-    }
-  }, [currentSession, fetchMessages, markSessionAsRead, markMessageAsRead, messages]);
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!messageText.trim() || !currentSession || isSubmitting || !agentMode) return;
-    
-    setIsSubmitting(true);
-    
-    try {
-      await sendMessage(currentSession.id, messageText, 'agent');
-      setMessageText('');
-      
-      addNotification({
-        type: 'success',
-        title: 'Message sent successfully',
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error('Error sending message:', error);
-      
-      addNotification({
-        type: 'error',
-        title: 'Failed to send message',
-        message: 'Please try again',
-        duration: 3000,
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleCloseSession = async (sessionId: string) => {
-    try {
-      await closeSession(sessionId);
-      
-      addNotification({
-        type: 'success',
-        title: 'Chat session closed',
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error('Error closing session:', error);
-      
-      addNotification({
-        type: 'error',
-        title: 'Failed to close session',
-        message: 'Please try again',
-        duration: 3000,
-      });
-    }
-  };
-
-  const handleTogglePin = async (sessionId: string, isPinned: boolean) => {
-    try {
-      const session = activeSessions.find(s => s.id === sessionId);
-      if (!session) return;
-      
-      await updateSessionMetadata(sessionId, {
-        ...session.metadata,
-        pinned: !isPinned
-      });
-      
-      addNotification({
-        type: 'success',
-        title: `Chat ${!isPinned ? 'pinned' : 'unpinned'}`,
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error('Error updating pin status:', error);
-      
-      addNotification({
-        type: 'error',
-        title: 'Failed to update pin status',
-        message: 'Please try again',
-        duration: 3000,
-      });
-    }
-  };
-
-  const handleAddLabel = async (sessionId: string, label: { text: string; color: string }) => {
-    try {
-      const session = activeSessions.find(s => s.id === sessionId);
-      if (!session) return;
-      
-      await updateSessionMetadata(sessionId, {
-        ...session.metadata,
-        label
-      });
-      
-      setShowLabelMenu(null);
-      
-      addNotification({
-        type: 'success',
-        title: `Label "${label.text}" added`,
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error('Error adding label:', error);
-      
-      addNotification({
-        type: 'error',
-        title: 'Failed to add label',
-        message: 'Please try again',
-        duration: 3000,
-      });
-    }
-  };
-
-  const handleRemoveLabel = async (sessionId: string) => {
-    try {
-      const session = activeSessions.find(s => s.id === sessionId);
-      if (!session) return;
-      
-      const { label, ...restMetadata } = session.metadata;
-      await updateSessionMetadata(sessionId, restMetadata);
-      
-      addNotification({
-        type: 'success',
-        title: 'Label removed',
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error('Error removing label:', error);
-      
-      addNotification({
-        type: 'error',
-        title: 'Failed to remove label',
-        message: 'Please try again',
-        duration: 3000,
-      });
-    }
-  };
-
-  const handleUpdateNote = async (sessionId: string) => {
-    try {
-      const session = activeSessions.find(s => s.id === sessionId);
-      if (!session) return;
-      
-      await updateSessionMetadata(sessionId, {
-        ...session.metadata,
-        note: noteText
-      });
-      
-      setShowNoteInput(null);
-      setNoteText('');
-      
-      addNotification({
-        type: 'success',
-        title: 'Note updated',
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error('Error updating note:', error);
-      
-      addNotification({
-        type: 'error',
-        title: 'Failed to update note',
-        message: 'Please try again',
-        duration: 3000,
-      });
-    }
-  };
-
-  const handleUpdateVisitorName = async (sessionId: string) => {
-    try {
-      const session = activeSessions.find(s => s.id === sessionId);
-      if (!session) return;
-      
-      await updateSessionMetadata(sessionId, {
-        ...session.metadata,
-        visitorName: visitorName
-      });
-      
-      setShowVisitorNameInput(null);
-      setVisitorName('');
-      
-      addNotification({
-        type: 'success',
-        title: 'Visitor name updated',
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error('Error updating visitor name:', error);
-      
-      addNotification({
-        type: 'error',
-        title: 'Failed to update visitor name',
-        message: 'Please try again',
-        duration: 3000,
-      });
-    }
-  };
-
-  // Filter and sort sessions
-  const filteredSessions = activeSessions
-    .filter(session => {
-      const searchLower = searchTerm.toLowerCase();
-      const visitorId = session.visitor_id.toLowerCase();
-      const visitorName = (session.metadata?.visitorName || '').toLowerCase();
-      const note = session.metadata?.note?.toLowerCase() || '';
-      const label = session.metadata?.label?.text.toLowerCase() || '';
-      
-      return visitorId.includes(searchLower) || 
-             visitorName.includes(searchLower) ||
-             note.includes(searchLower) || 
-             label.includes(searchLower);
-    })
-    .sort((a, b) => {
-      // First sort by unread status
-      if (a.metadata?.unread && !b.metadata?.unread) return -1;
-      if (!a.metadata?.unread && b.metadata?.unread) return 1;
-      
-      // Then sort by pinned status
-      if (a.metadata?.pinned && !b.metadata?.pinned) return -1;
-      if (!a.metadata?.pinned && b.metadata?.pinned) return 1;
-      
-      // Finally sort by latest message date
-      const aDate = a.latest_message?.created_at || a.updated_at;
-      const bDate = b.latest_message?.created_at || b.updated_at;
-      return new Date(bDate).getTime() - new Date(aDate).getTime();
-    });
-
-  const handleSelectSession = (sessionId: string) => {
-    setCurrentSession(sessionId);
-    if (isMobile) {
-      setShowChatOnMobile(true);
-    }
-  };
-
-  const handleBackToList = () => {
-    if (isMobile) {
-      setShowChatOnMobile(false);
-    }
-  };
+  // ... existing state and hooks ...
 
   return (
     <div className="h-[calc(100vh-4rem)] flex">
@@ -334,32 +20,7 @@ const LiveChat: React.FC = () => {
       <div className={`${
         isMobile && showChatOnMobile ? 'hidden' : 'block'
       } w-full md:w-80 border-r border-gray-200 bg-white flex flex-col`}>
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium">Live Chat</h2>
-            <button
-              onClick={toggleAgentMode}
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
-                agentMode
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-gray-100 text-gray-800'
-              }`}
-            >
-              {agentMode ? 'Online' : 'Offline'}
-            </button>
-          </div>
-          
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search conversations..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 pl-9 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          </div>
-        </div>
+        {/* ... existing sessions list header ... */}
         
         <div className="flex-1 overflow-y-auto">
           {filteredSessions.length === 0 ? (
@@ -435,191 +96,7 @@ const LiveChat: React.FC = () => {
       } flex-1 flex flex-col bg-gray-50`}>
         {currentSession ? (
           <>
-            {/* Chat Header */}
-            <div className="bg-white border-b border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  {isMobile && (
-                    <button
-                      onClick={handleBackToList}
-                      className="mr-2 p-2 rounded-md hover:bg-gray-100"
-                    >
-                      <ChevronDown className="h-5 w-5 transform rotate-90" />
-                    </button>
-                  )}
-                  <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium">
-                    {currentSession.metadata?.visitorName 
-                      ? currentSession.metadata.visitorName.charAt(0).toUpperCase()
-                      : currentSession.visitor_id.charAt(0).toUpperCase()
-                    }
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-lg font-medium">
-                      {currentSession.metadata?.visitorName || `Visitor ${currentSession.visitor_id.slice(0, 8)}`}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      Started {format(new Date(currentSession.created_at), 'MMM d, h:mm a')}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleTogglePin(currentSession.id, !!currentSession.metadata?.pinned)}
-                    className={`p-2 rounded-md hover:bg-gray-100 ${
-                      currentSession.metadata?.pinned ? 'text-indigo-600' : 'text-gray-500'
-                    }`}
-                  >
-                    <Pin className="h-5 w-5" />
-                  </button>
-                  
-                  <button
-                    onClick={() => setShowLabelMenu(currentSession.id)}
-                    className={`p-2 rounded-md hover:bg-gray-100 ${
-                      currentSession.metadata?.label ? 'text-indigo-600' : 'text-gray-500'
-                    }`}
-                  >
-                    <Tag className="h-5 w-5" />
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setShowVisitorNameInput(currentSession.id);
-                      setVisitorName(currentSession.metadata?.visitorName || '');
-                    }}
-                    className="p-2 rounded-md hover:bg-gray-100 text-gray-500"
-                  >
-                    <User className="h-5 w-5" />
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setShowNoteInput(currentSession.id);
-                      setNoteText(currentSession.metadata?.note || '');
-                    }}
-                    className="p-2 rounded-md hover:bg-gray-100 text-gray-500"
-                  >
-                    <MessageCircle className="h-5 w-5" />
-                  </button>
-                  
-                  <button
-                    onClick={() => handleCloseSession(currentSession.id)}
-                    className="p-2 rounded-md hover:bg-gray-100 text-red-500"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-                
-                {showLabelMenu === currentSession.id && (
-                  <div className="absolute right-4 mt-12 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                    <div className="py-1">
-                      {labels.map((label) => (
-                        <button
-                          key={label.text}
-                          onClick={() => handleAddLabel(currentSession.id, label)}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
-                          style={{ color: label.color }}
-                        >
-                          <span
-                            className="h-3 w-3 rounded-full mr-2"
-                            style={{ backgroundColor: label.color }}
-                          />
-                          {label.text}
-                        </button>
-                      ))}
-                      
-                      {currentSession.metadata?.label && (
-                        <>
-                          <div className="border-t border-gray-200 my-1" />
-                          <button
-                            onClick={() => {
-                              handleRemoveLabel(currentSession.id);
-                              setShowLabelMenu(null);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
-                          >
-                            <X className="h-4 w-4 mr-2" />
-                            Remove Label
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-                
-                {showNoteInput === currentSession.id && (
-                  <div className="absolute right-4 mt-12 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 p-3">
-                    <textarea
-                      value={noteText}
-                      onChange={(e) => setNoteText(e.target.value)}
-                      placeholder="Add a note..."
-                      className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    />
-                    <div className="flex justify-end mt-2 space-x-2">
-                      <button
-                        onClick={() => {
-                          setShowNoteInput(null);
-                          setNoteText('');
-                        }}
-                        className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleUpdateNote(currentSession.id)}
-                        className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {showVisitorNameInput === currentSession.id && (
-                  <div className="absolute right-4 mt-12 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 p-3">
-                    <input
-                      type="text"
-                      value={visitorName}
-                      onChange={(e) => setVisitorName(e.target.value)}
-                      placeholder="Enter visitor name..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    />
-                    <div className="flex justify-end mt-2 space-x-2">
-                      <button
-                        onClick={() => {
-                          setShowVisitorNameInput(null);
-                          setVisitorName('');
-                        }}
-                        className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleUpdateVisitorName(currentSession.id)}
-                        className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {currentSession.metadata?.note && (
-                <div className="mt-2 p-3 bg-yellow-50 rounded-md">
-                  <p className="text-sm text-yellow-800">{currentSession.metadata.note}</p>
-                </div>
-              )}
-
-              {!agentMode && (
-                <div className="mt-2 p-3 bg-red-50 rounded-md">
-                  <p className="text-sm text-red-800 flex items-center">
-                    <AlertCircle className="h-4 w-4 mr-2" />
-                    Agent mode is offline. Enable it to respond to messages.
-                  </p>
-                </div>
-              )}
-            </div>
+            {/* ... existing chat header ... */}
             
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4">
@@ -631,22 +108,20 @@ const LiveChat: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {messages[currentSession.id]?.map((message) => (
+                  {messages[currentSession.id]?.map((message, msgIndex) => (
                     <div
                       key={message.id}
                       className={`flex ${
                         message.sender_type === 'user' ? 'justify-start' : 'justify-end'
                       }`}
                     >
-                      <div
-                        className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                          message.sender_type === 'user'
-                            ? 'bg-white text-gray-900'
-                            : message.sender_type === 'agent'
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-gray-100 text-gray-800'
-                        } relative`}
-                      >
+                      <div className={`relative max-w-[70%] rounded-lg px-4 py-2 ${
+                        message.sender_type === 'user'
+                          ? 'bg-white text-gray-900'
+                          : message.sender_type === 'agent'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-gray-100 text-gray-800'
+                      } ${msgIndex > 0 ? 'mt-1' : ''}`}>
                         {message.metadata?.unread && (
                           <span className="absolute -top-2 -right-2 h-3 w-3 bg-red-500 rounded-full border-2 border-white"></span>
                         )}
@@ -659,6 +134,19 @@ const LiveChat: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+              
+              {/* Typing indicator */}
+              {isTyping && (
+                <div className="flex justify-start mt-2">
+                  <div className="bg-gray-100 rounded-full px-4 py-2">
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
