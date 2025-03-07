@@ -49,18 +49,15 @@ type Message = {
   isRead?: boolean;
 };
 
-// Group messages by sender for better display
 type MessageGroup = {
   sender: 'user' | 'bot' | 'agent';
   messages: Message[];
 };
 
-// Helper function to group messages
 const groupMessages = (messages: Message[]): MessageGroup[] => {
   const groups: MessageGroup[] = [];
   let currentGroup: MessageGroup | null = null;
 
-  // Sort messages by timestamp in ascending order
   const sortedMessages = [...messages].sort((a, b) => 
     a.timestamp.getTime() - b.timestamp.getTime()
   );
@@ -93,14 +90,13 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
   const [hasUserSentFirstMessage, setHasUserSentFirstMessage] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   // Create Supabase client
   const supabase = createClient(
-    'https://zawhdprorlwaagmmyyer.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inphd2hkcHJvcmx3YWFnbW15eWVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5MzU1NTEsImV4cCI6MjA1NjUxMTU1MX0.HaHu907PQHPxSWNQrUsP6gNOpRaN08PnSZF-pN-BaD8'
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
   );
 
-  // Scroll to bottom when new messages arrive
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -109,13 +105,11 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
     scrollToBottom();
   }, [messages]);
 
-  // Update unread count and handle new messages
   useEffect(() => {
     if (!isOpen) {
       const newMessages = messages.filter(m => m.isNew || !m.isRead);
       setUnreadCount(newMessages.length);
     } else {
-      // Mark all messages as read when chat is opened
       setMessages(prevMessages => 
         prevMessages.map(msg => ({
           ...msg,
@@ -127,22 +121,10 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
     }
   }, [isOpen, messages]);
 
-  // Initialize chat
   useEffect(() => {
     const initChat = async () => {
       try {
-        // Fetch widget settings
-        const { data: settingsData } = await supabase
-          .from('widget_settings')
-          .select('*')
-          .eq('user_id', uid)
-          .single();
-        
-        if (settingsData) {
-          setSettings(settingsData);
-        }
-
-        // Generate or retrieve visitor ID
+        // Generate or retrieve visitor ID first
         const storedVisitorId = localStorage.getItem('chat_visitor_id');
         const newVisitorId = storedVisitorId || nanoid();
         if (!storedVisitorId) {
@@ -150,24 +132,37 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
         }
         setVisitorId(newVisitorId);
 
-        // Fetch existing session if any
-        const { data: sessionData } = await supabase
+        // Fetch widget settings
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('widget_settings')
+          .select('*')
+          .eq('user_id', uid)
+          .single();
+        
+        if (settingsError) throw settingsError;
+        if (settingsData) {
+          setSettings(settingsData);
+        }
+
+        // Fetch existing session
+        const { data: sessionData, error: sessionError } = await supabase
           .from('chat_sessions')
           .select('*')
           .eq('visitor_id', newVisitorId)
           .eq('status', 'active')
           .single();
 
-        if (sessionData) {
+        if (!sessionError && sessionData) {
           setSessionId(sessionData.id);
+          
           // Fetch existing messages
-          const { data: messagesData } = await supabase
+          const { data: messagesData, error: messagesError } = await supabase
             .from('chat_messages')
             .select('*')
             .eq('chat_session_id', sessionData.id)
             .order('created_at', { ascending: true });
 
-          if (messagesData) {
+          if (!messagesError && messagesData) {
             setMessages(messagesData.map(msg => ({
               id: msg.id,
               sender: msg.sender_type,
@@ -180,20 +175,19 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
         }
 
         // Fetch auto replies and advanced replies
-        const { data: autoRepliesData } = await supabase
-          .from('auto_replies')
-          .select('*')
-          .eq('user_id', uid);
-        
-        const { data: advancedRepliesData } = await supabase
-          .from('advanced_replies')
-          .select('*')
-          .eq('user_id', uid);
+        const [autoRepliesResponse, advancedRepliesResponse] = await Promise.all([
+          supabase.from('auto_replies').select('*').eq('user_id', uid),
+          supabase.from('advanced_replies').select('*').eq('user_id', uid)
+        ]);
 
-        if (autoRepliesData) setAutoReplies(autoRepliesData);
-        if (advancedRepliesData) setAdvancedReplies(advancedRepliesData);
+        if (!autoRepliesResponse.error && autoRepliesResponse.data) {
+          setAutoReplies(autoRepliesResponse.data);
+        }
+        if (!advancedRepliesResponse.error && advancedRepliesResponse.data) {
+          setAdvancedReplies(advancedRepliesResponse.data);
+        }
 
-        // Set up real-time subscription for new messages
+        // Set up real-time subscription if session exists
         if (sessionData?.id) {
           const subscription = supabase
             .channel(`messages:${sessionData.id}`)
@@ -211,8 +205,8 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
                   sender: payload.new.sender_type,
                   text: payload.new.message,
                   timestamp: new Date(payload.new.created_at),
-                  isNew: !isOpen, // Mark as new if chat is closed
-                  isRead: isOpen // Mark as read if chat is open
+                  isNew: !isOpen,
+                  isRead: isOpen
                 };
                 setMessages(prev => [...prev, newMessage]);
               }
@@ -239,22 +233,28 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
           user_id: uid,
           visitor_id: visitorId,
           status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          metadata: {},
+          typing_users: [],
+          last_activity: new Date().toISOString()
         })
         .select()
         .single();
 
       if (error) throw error;
+      
       if (data) {
         setSessionId(data.id);
+        
         // Send welcome message if configured
         if (settings?.welcome_message) {
           await sendMessage(settings.welcome_message, 'bot');
         }
+        
+        return data.id;
       }
     } catch (error) {
       console.error('Error creating session:', error);
+      throw error;
     }
   };
 
@@ -263,35 +263,56 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
   };
 
   const sendMessage = async (text: string, sender: 'user' | 'bot' | 'agent') => {
-    if (!sessionId && sender === 'user') {
-      await createSession();
-    }
-
-    const newMessage: Message = {
-      id: nanoid(),
-      sender,
-      text,
-      timestamp: new Date(),
-      isNew: !isOpen, // Mark as new if chat is closed
-      isRead: isOpen // Mark as read if chat is open
-    };
-
-    // Add message to the array
-    setMessages(prevMessages => [...prevMessages, newMessage]);
-
     try {
-      if (sessionId) {
-        await supabase
-          .from('chat_messages')
-          .insert({
-            chat_session_id: sessionId,
-            sender_type: sender,
-            message: text,
-            created_at: new Date().toISOString()
-          });
+      let currentSessionId = sessionId;
+      
+      // Create session if it doesn't exist
+      if (!currentSessionId && sender === 'user') {
+        currentSessionId = await createSession();
       }
+
+      if (!currentSessionId) {
+        throw new Error('No active session');
+      }
+
+      // Add message to UI immediately
+      const newMessage: Message = {
+        id: nanoid(),
+        sender,
+        text,
+        timestamp: new Date(),
+        isNew: !isOpen,
+        isRead: isOpen
+      };
+      setMessages(prev => [...prev, newMessage]);
+
+      // Save message to database
+      const { error: messageError } = await supabase
+        .from('chat_messages')
+        .insert({
+          chat_session_id: currentSessionId,
+          sender_type: sender,
+          message: text,
+          metadata: {
+            unread: !isOpen
+          }
+        });
+
+      if (messageError) throw messageError;
+
+      // Update session activity
+      const { error: sessionError } = await supabase
+        .from('chat_sessions')
+        .update({
+          last_activity: new Date().toISOString()
+        })
+        .eq('id', currentSessionId);
+
+      if (sessionError) throw sessionError;
+
     } catch (error) {
-      console.error('Error saving message:', error);
+      console.error('Error sending message:', error);
+      throw error;
     }
   };
 
@@ -303,48 +324,31 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
     const userMessage = message.trim();
     setMessage('');
     
-    // Send user message
-    await sendMessage(userMessage, 'user');
-    
-    if (!hasUserSentFirstMessage) {
-      setHasUserSentFirstMessage(true);
-    }
-    
-    // Show typing indicator
-    setIsTyping(true);
-    
-    // Find matching reply
-    const messageLower = userMessage.toLowerCase();
-    let replied = false;
-    
-    // Check auto replies
-    for (const reply of autoReplies) {
-      if (reply.keywords.some((keyword: string) => 
-        messageLower.includes(keyword.toLowerCase())
-      )) {
-        setTimeout(() => {
-          sendMessage(reply.response, 'bot');
-          setIsTyping(false);
-        }, 1000);
-        replied = true;
-        break;
+    try {
+      // Send user message
+      await sendMessage(userMessage, 'user');
+      
+      if (!hasUserSentFirstMessage) {
+        setHasUserSentFirstMessage(true);
       }
-    }
-    
-    // Check advanced replies if no auto reply matched
-    if (!replied) {
-      for (const reply of advancedReplies) {
+      
+      // Show typing indicator
+      setIsTyping(true);
+      
+      // Find matching reply
+      const messageLower = userMessage.toLowerCase();
+      let replied = false;
+      
+      // Check auto replies
+      for (const reply of autoReplies) {
         if (reply.keywords.some((keyword: string) => 
           messageLower.includes(keyword.toLowerCase())
         )) {
-          setTimeout(() => {
-            if (reply.response_type === 'url') {
-              sendMessage(
-                `<a href="${reply.response}" target="_blank" class="text-blue-600 hover:underline">${reply.button_text || 'Click here'}</a>`,
-                'bot'
-              );
-            } else {
-              sendMessage(reply.response, 'bot');
+          setTimeout(async () => {
+            try {
+              await sendMessage(reply.response, 'bot');
+            } catch (error) {
+              console.error('Error sending auto reply:', error);
             }
             setIsTyping(false);
           }, 1000);
@@ -352,18 +356,52 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
           break;
         }
       }
-    }
-    
-    // Send fallback message if no reply matched
-    if (!replied && settings?.fallback_message) {
-      setTimeout(() => {
-        sendMessage(settings.fallback_message, 'bot');
-        setIsTyping(false);
-      }, 1000);
-    } else if (!replied) {
-      setTimeout(() => {
-        setIsTyping(false);
-      }, 1000);
+      
+      // Check advanced replies if no auto reply matched
+      if (!replied) {
+        for (const reply of advancedReplies) {
+          if (reply.keywords.some((keyword: string) => 
+            messageLower.includes(keyword.toLowerCase())
+          )) {
+            setTimeout(async () => {
+              try {
+                if (reply.response_type === 'url') {
+                  await sendMessage(
+                    `<a href="${reply.response}" target="_blank" class="text-blue-600 hover:underline">${reply.button_text || 'Click here'}</a>`,
+                    'bot'
+                  );
+                } else {
+                  await sendMessage(reply.response, 'bot');
+                }
+              } catch (error) {
+                console.error('Error sending advanced reply:', error);
+              }
+              setIsTyping(false);
+            }, 1000);
+            replied = true;
+            break;
+          }
+        }
+      }
+      
+      // Send fallback message if no reply matched
+      if (!replied && settings?.fallback_message) {
+        setTimeout(async () => {
+          try {
+            await sendMessage(settings.fallback_message, 'bot');
+          } catch (error) {
+            console.error('Error sending fallback message:', error);
+          }
+          setIsTyping(false);
+        }, 1000);
+      } else if (!replied) {
+        setTimeout(() => {
+          setIsTyping(false);
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Error in message handling:', error);
+      setIsTyping(false);
     }
   };
 
@@ -448,11 +486,9 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
                               : 'bg-gray-100 text-gray-800'
                           } ${msgIndex > 0 ? 'mt-1' : ''}`}
                         >
-                          {/* New message indicator */}
                           {msg.isNew && (
                             <span className="absolute -top-2 -right-2 h-3 w-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
                           )}
-                          {/* Message content with bold text for unread messages */}
                           <div className={`${(!msg.isRead || msg.isNew) ? 'font-semibold' : 'font-normal'}`}>
                             {msg.sender === 'bot' ? (
                               <div dangerouslySetInnerHTML={{ __html: msg.text }} />
