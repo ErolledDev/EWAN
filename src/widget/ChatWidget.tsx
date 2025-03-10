@@ -234,8 +234,8 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
           visitor_id: visitorId,
           status: 'active',
           metadata: {},
-          typing_users: [],
-          last_activity: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .select()
         .single();
@@ -249,6 +249,31 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
         if (settings?.welcome_message) {
           await sendMessage(settings.welcome_message, 'bot');
         }
+        
+        // Set up real-time subscription for the new session
+        const subscription = supabase
+          .channel(`messages:${data.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'chat_messages',
+              filter: `chat_session_id=eq.${data.id}`
+            },
+            (payload) => {
+              const newMessage = {
+                id: payload.new.id,
+                sender: payload.new.sender_type,
+                text: payload.new.message,
+                timestamp: new Date(payload.new.created_at),
+                isNew: !isOpen,
+                isRead: isOpen
+              };
+              setMessages(prev => [...prev, newMessage]);
+            }
+          )
+          .subscribe();
         
         return data.id;
       }
@@ -295,7 +320,8 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
           message: text,
           metadata: {
             unread: !isOpen
-          }
+          },
+          created_at: new Date().toISOString()
         });
 
       if (messageError) throw messageError;
@@ -304,7 +330,7 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ uid }) => {
       const { error: sessionError } = await supabase
         .from('chat_sessions')
         .update({
-          last_activity: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
         .eq('id', currentSessionId);
 

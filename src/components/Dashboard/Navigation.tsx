@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Settings, MessageSquare, Zap, Bot, LogOut } from 'lucide-react';
+import { Settings, MessageSquare, Zap, Bot, LogOut, MessageCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 const Navigation: React.FC = () => {
@@ -85,6 +85,20 @@ const Navigation: React.FC = () => {
         >
           <Bot className="mr-3 h-5 w-5" />
           AI Mode
+        </NavLink>
+
+        <NavLink
+          to="/dashboard/live-chat"
+          className={({ isActive }) =>
+            `flex items-center px-4 py-2 text-sm font-medium rounded-md ${
+              isActive
+                ? 'bg-indigo-100 text-indigo-700'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`
+          }
+        >
+          <MessageCircle className="mr-3 h-5 w-5" />
+          Live Chat
         </NavLink>
       </nav>
       
