@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useChatStore } from '../../store/chatStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { format } from 'date-fns';
 import { MessageCircle, Send, Search, X, Pin, Tag, AlertCircle, ChevronDown, MoreVertical, Edit, User } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
+import { supabase } from '../../lib/supabase';
 
 const LiveChat: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -15,6 +16,13 @@ const LiveChat: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [agentMode, setAgentMode] = useState(true);
 
+  const wsRef = useRef<any>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [isConnected, setIsConnected] = useState(false);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const maxReconnectAttempts = 5;
+
   const { user } = useAuthStore();
   const { 
     activeSessions, 
@@ -23,11 +31,12 @@ const LiveChat: React.FC = () => {
     fetchSessions,
     setCurrentSession,
     sendMessage,
-    fetchMessages 
+    fetchMessages,
+    addMessage,
+    updateSession
   } = useChatStore();
   const { addNotification } = useNotificationStore();
 
-  // Check for mobile screen size
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -38,14 +47,126 @@ const LiveChat: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Fetch sessions when component mounts
   useEffect(() => {
     if (user) {
       fetchSessions(user.id);
     }
+    
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.unsubscribe();
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
   }, [user, fetchSessions]);
 
-  // Filter sessions based on search term
+  useEffect(() => {
+    if (currentSession) {
+      setupRealtimeConnection();
+    }
+    
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.unsubscribe();
+      }
+    };
+  }, [currentSession]);
+
+  const setupRealtimeConnection = () => {
+    if (!currentSession) return;
+
+    wsRef.current = supabase
+      .channel(`chat:${currentSession.id}`)
+      .on('presence', { event: 'sync' }, () => {
+        setIsConnected(true);
+      })
+      .on('presence', { event: 'join' }, ({ newPresences }) => {
+        console.log('New presence:', newPresences);
+      })
+      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+        console.log('Left presence:', leftPresences);
+      })
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `chat_session_id=eq.${currentSession.id}`
+        },
+        handleNewMessage
+      )
+      .subscribe(async (status: string) => {
+        if (status === 'SUBSCRIBED') {
+          setIsConnected(true);
+          setReconnectAttempts(0);
+          console.log('Connected to real-time updates');
+        } else {
+          setIsConnected(false);
+          handleConnectionError();
+        }
+      });
+  };
+
+  const handleConnectionError = () => {
+    if (reconnectAttempts < maxReconnectAttempts) {
+      setReconnectAttempts(prev => prev + 1);
+      reconnectTimeoutRef.current = setTimeout(() => {
+        console.log(`Attempting to reconnect (${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+        setupRealtimeConnection();
+      }, 2000 * Math.pow(2, reconnectAttempts));
+    }
+  };
+
+  const handleNewMessage = async (payload: any) => {
+    const newMessage = payload.new;
+    if (!newMessage) return;
+
+    try {
+      addMessage(currentSession!.id, {
+        id: newMessage.id,
+        chat_session_id: newMessage.chat_session_id,
+        sender_type: newMessage.sender_type,
+        message: newMessage.message,
+        created_at: newMessage.created_at,
+        metadata: {
+          unread: !isOpen || currentSession?.id !== newMessage.chat_session_id
+        }
+      });
+
+      if (currentSession) {
+        const updatedSession = {
+          ...currentSession,
+          latest_message: {
+            message: newMessage.message,
+            created_at: newMessage.created_at,
+            sender_type: newMessage.sender_type
+          }
+        };
+        updateSession(updatedSession);
+      }
+
+      if (newMessage.sender_type === 'user') {
+        playNotificationSound();
+      }
+    } catch (error) {
+      console.error('Error handling new message:', error);
+      addNotification({
+        type: 'error',
+        title: 'Error receiving message',
+        message: 'Please refresh the page',
+        duration: 5000
+      });
+    }
+  };
+
+  const playNotificationSound = () => {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YWoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBkCU1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTqO0/DRgDMGHm7A7+OZRA0PVqzn77BdGAg+ltryxnMpBSh8yu7blEILFlyx6OyrWBUIQ5zd8sFuJAU3jNDu1YU2Bhxqvu3mnEcODlOq5O+zYBoIPJPY8cp2KwUme8nt3ZdFDBVZr+btrVoXCECY2/LDcSYFNYnO79iIOQYbarv15p9IDgxPqOPwtWIdBzmP1fLNei4FJHnH7t+aRw0UV63l764dGQc9ltnyzHQoBTOHze/YizsHGWe47OihSxALTKXh77hjHgc2jdLx0H4xBSF2xe3hmUoOElOq4/CxYRoGOpDW8tB4LQUchMru4JFBCBVV');
+    audio.play().catch(console.error);
+  };
+
   const filteredSessions = activeSessions.filter(session => {
     const searchLower = searchTerm.toLowerCase();
     const visitorName = session.metadata?.visitorName || `Visitor ${session.visitor_id.slice(0, 8)}`;
@@ -100,7 +221,12 @@ const LiveChat: React.FC = () => {
         <meta name="description" content="Manage your live chat sessions and interact with visitors in real-time." />
       </Helmet>
       
-      {/* Sessions List */}
+      <div className={`fixed top-4 right-4 px-3 py-1 rounded-full text-sm font-medium ${
+        isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+      }`}>
+        {isConnected ? 'Connected' : 'Reconnecting...'}
+      </div>
+      
       <div className={`${
         isMobile && showChatOnMobile ? 'hidden' : 'block'
       } w-full md:w-80 border-r border-gray-200 bg-white flex flex-col`}>
@@ -185,13 +311,11 @@ const LiveChat: React.FC = () => {
         </div>
       </div>
       
-      {/* Chat Area */}
       <div className={`${
         isMobile && !showChatOnMobile ? 'hidden' : 'block'
       } flex-1 flex flex-col bg-gray-50`}>
         {currentSession ? (
           <>
-            {/* Chat Header */}
             <div className="bg-white border-b border-gray-200 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
@@ -240,7 +364,6 @@ const LiveChat: React.FC = () => {
               </div>
             </div>
             
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4">
               {messages[currentSession.id]?.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -279,7 +402,6 @@ const LiveChat: React.FC = () => {
                 </div>
               )}
               
-              {/* Typing indicator */}
               {isTyping && (
                 <div className="flex justify-start mt-2">
                   <div className="bg-gray-100 rounded-full px-4 py-2">
@@ -293,7 +415,6 @@ const LiveChat: React.FC = () => {
               )}
             </div>
             
-            {/* Message Input */}
             <div className="bg-white border-t border-gray-200 p-4">
               <form onSubmit={handleSendMessage} className="flex space-x-4">
                 <input
